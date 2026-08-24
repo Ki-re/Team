@@ -20,6 +20,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mcp-websearch:
+        condition: service_healthy
     healthcheck:
       # la imagen no trae wget/curl; usamos el python del propio venv de la app
       test: ["CMD", "/app/.venv/bin/python3", "-c",
@@ -70,6 +72,29 @@ services:
       resources:
         limits:
           memory: 160M
+
+  mcp-websearch:
+    build: ./mcp-websearch
+    container_name: team-mcp-websearch
+    restart: unless-stopped
+    # sin puerto publicado al host a propósito: solo litellm (misma red
+    # docker interna) necesita alcanzarlo, no hace falta exponerlo fuera.
+    environment:
+      BRAVE_API_KEY: ${BRAVE_API_KEY}
+    healthcheck:
+      # solo confirma que el puerto escucha; el endpoint /mcp real exige el
+      # protocolo MCP (POST con sesión), no un GET simple, así que no
+      # asumimos nada sobre el código de respuesta.
+      test: ["CMD", "python", "-c",
+             "import socket; socket.create_connection(('localhost', 8090), timeout=4)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   postgres_data:

@@ -71,6 +71,40 @@ class Router:
             temperature=temperature,
         )
 
+    async def context_with_tools(self, workflow: str, prompt: str) -> str:
+        """Como `context()`, pero con acceso a las tools MCP registradas en
+        el gateway (hoy: solo `web_search`, ver Fase 7 del plan). Solo
+        tier-context: es donde el tool-calling es fiable con los modelos
+        gratis actuales."""
+        t0 = time.monotonic()
+        # require_approval: "never" es imprescindible — sin él LiteLLM
+        # devuelve la function_call pendiente de aprobación humana en vez
+        # de ejecutarla, y la respuesta nunca llega a texto final
+        # (confirmado en vivo el 2026-08-24: con el flag, LiteLLM ejecuta
+        # la tool de verdad, ver tool_execution_results en la respuesta).
+        tools = [{
+            "type": "mcp", "server_url": "litellm_proxy",
+            "server_label": "web_search", "require_approval": "never",
+        }]
+        try:
+            result = await self.gateway.respond_with_tools(
+                self._config.tier_context, prompt, tools=tools,
+            )
+        except Exception:
+            self._ledger.record(SpendEvent(
+                workflow=workflow, tier=self._config.tier_context, model="responses+tools",
+                tokens_in=0, tokens_out=0,
+                latency_ms=(time.monotonic() - t0) * 1000, ok=False,
+            ))
+            raise
+
+        self._ledger.record(SpendEvent(
+            workflow=workflow, tier=self._config.tier_context, model="responses+tools",
+            tokens_in=0, tokens_out=0,
+            latency_ms=(time.monotonic() - t0) * 1000, ok=True,
+        ))
+        return result
+
     async def premium_review(self, workflow: str, prompt: str) -> str:
         t0 = time.monotonic()
         result = await self.premium.complete(prompt)

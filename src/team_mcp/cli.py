@@ -12,9 +12,7 @@ import asyncio
 import json
 import sys
 
-from dotenv import load_dotenv
-
-from team_mcp.config import load_config
+from team_mcp.config import load_config, load_env
 from team_mcp.engine.ledger import Ledger
 from team_mcp.providers.router import Router
 
@@ -67,11 +65,12 @@ def main() -> None:
     p_run.add_argument("--scope-paths", nargs="*", default=None)
     p_run.add_argument("--question")
     p_run.add_argument("--spec-file")
+    p_run.add_argument("--allow-web-search", action="store_true")
     p_run.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
 
-    load_dotenv()
+    load_env()
 
     if args.cmd == "run" and args.dry_run:
         import os
@@ -106,7 +105,11 @@ def main() -> None:
                     "repro_command": args.repro_command,
                 }
             elif args.tool == "team_ask":
-                kwargs = {"question": args.question, "scope_paths": args.scope_paths or []}
+                kwargs = {
+                    "question": args.question,
+                    "scope_paths": args.scope_paths or [],
+                    "allow_web_search": args.allow_web_search,
+                }
             elif args.tool == "team_validate":
                 kwargs = {"scope": args.scope, "spec_original": spec_original}
             elif args.tool == "team_epic":

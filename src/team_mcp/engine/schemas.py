@@ -59,7 +59,11 @@ class VerificationResult(BaseModel):
 
     @property
     def passes_gate(self) -> bool:
-        return self.parses and self.lint_ok
+        # solo "parsea" es el gate duro y gratuito, tal como dice el plan.
+        # lint_ok queda como señal informativa: un ruff nit cosmético
+        # (orden de imports, línea en blanco) no debe rechazar código
+        # correcto — visto fallar así en pruebas reales de kind=refactor.
+        return self.parses
 
 
 class CrossMatrixCell(BaseModel):

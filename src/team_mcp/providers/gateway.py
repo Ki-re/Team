@@ -54,6 +54,52 @@ class GatewayProvider:
             raise GatewayError(f"{tier} -> HTTP {resp.status_code}: {resp.text[:500]}")
         return resp.json()
 
+    async def respond_with_tools(
+        self,
+        tier: str,
+        input_text: str,
+        *,
+        tools: list[dict],
+        temperature: float = 0.2,
+    ) -> str:
+        """Llama a /v1/responses (Responses API), no /v1/chat/completions —
+        formato distinto, necesario para tool-use vía el MCP Gateway de
+        LiteLLM (Fase 7 del plan). Úsalo solo con tiers/modelos que de
+        verdad soporten tool-calling (hoy: tier-context); no se ha probado
+        con tier-fast/tier-coder.
+
+        El parseo de la respuesta es best-effort sobre el formato Responses
+        API estándar (`output: [{type: "message", content: [{type:
+        "output_text", text: ...}]}]`) — revisar si LiteLLM lo expone
+        distinto al verificar en vivo.
+        """
+        payload = {
+            "model": tier,
+            "input": input_text,
+            "tools": tools,
+            "temperature": temperature,
+        }
+        resp = await self._client.post("/v1/responses", json=payload)
+        if resp.status_code >= 400:
+            raise GatewayError(f"{tier} (responses) -> HTTP {resp.status_code}: {resp.text[:500]}")
+        data = resp.json()
+
+        texts: list[str] = []
+        for item in data.get("output", []):
+            if item.get("type") != "message":
+                continue
+            for part in item.get("content", []):
+                if part.get("type") in ("output_text", "text"):
+                    # algunos backends del pool devuelven "text": null en
+                    # vez de omitir la clave (visto en vivo el 2026-08-24
+                    # contra tier-context) — .get(..., "") no basta porque
+                    # la clave SÍ existe, solo que vale None.
+                    texts.append(part.get("text") or "")
+        joined = "\n".join(texts).strip()
+        if not joined:
+            raise GatewayError(f"{tier} (responses): sin output_text parseable en {str(data)[:500]}")
+        return joined
+
     async def liveliness(self) -> bool:
         try:
             resp = await self._client.get("/health/liveliness", timeout=5.0)

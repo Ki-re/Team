@@ -98,6 +98,16 @@ model_list:
       model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
 
+# ---------------- MCP Gateway: tool-use para workers (Fase 7 del plan) ----------------
+# Solo usado por team_ask (allow_web_search=True) sobre tier-context. Nada
+# que escribe código (team_task/team_feature/team_epic) toca esto — dar
+# tool-use en vivo a un worker que genera código sería una vía de escape a
+# la jaula de sandbox.py. Esquema verificado contra docs.litellm.ai/docs/mcp
+# a la fecha de escritura; revisar si LiteLLM cambia el formato.
+mcp_servers:
+  web_search:
+    url: "http://mcp-websearch:8090/mcp"  # nombre del servicio docker, red interna
+
 router_settings:
   routing_strategy: simple-shuffle
   # una key/modelo que falla repetidamente sale del pool temporalmente
