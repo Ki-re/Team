@@ -32,8 +32,10 @@ Código actual:
 Error concreto a resolver:
 {error}
 
-Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "search": "...", "replace": "..."}}]}}
-Cada `search` debe copiarse literalmente del código actual mostrado arriba.
+Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "replace": "<contenido COMPLETO del archivo ya corregido>"}}]}}
+Para cada archivo que toques, `replace` debe ser el archivo ENTERO, no un
+fragmento ni un diff — se sobrescribe tal cual. Incluye TODOS los archivos
+mostrados arriba en tu respuesta, aunque no cambies alguno.
 """
 
 
@@ -51,8 +53,25 @@ def _edits_signature(edits: list[FileEdit]) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
-def _render_code(edits: list[FileEdit]) -> str:
-    return "\n\n".join(f"--- {e.path} ---\n{e.replace}" for e in edits)
+def _materialize_to_dict(base_files: dict[str, str], edits: list[FileEdit]) -> dict[str, str]:
+    """Reconstruye el contenido REAL por archivo tras aplicar `edits` sobre
+    `base_files`, en memoria. Necesario porque `edits` puede contener
+    fragmentos search/replace parciales (no el archivo completo), y el
+    prompt de reparación necesita ver el archivo tal cual quedó, no un
+    recorte — si no, el modelo repara a ciegas."""
+    state = dict(base_files)
+    for e in edits:
+        current = state.get(e.path, "")
+        if e.search == "" or current.count(e.search) != 1:
+            state[e.path] = e.replace
+        else:
+            state[e.path] = current.replace(e.search, e.replace, 1)
+    return state
+
+
+def _render_code(base_files: dict[str, str], edits: list[FileEdit]) -> str:
+    state = _materialize_to_dict(base_files, edits)
+    return "\n\n".join(f"--- {path} ---\n{content}" for path, content in state.items())
 
 
 async def repair_loop(
@@ -75,13 +94,18 @@ async def repair_loop(
 
     for i in range(1, max_iterations + 1):
         prompt = _PROMPT.format(
-            spec=spec, code=_render_code(current_edits), error=current_error[:1500],
+            spec=spec, code=_render_code(base_files, current_edits), error=current_error[:1500],
         )
         raw = await router.coder(workflow, prompt, temperature=0.2)
 
         try:
             data = extract_json(raw)
-            new_edits = [FileEdit(**e) for e in data["edits"]]
+            # search se fuerza a "" pase lo que pase: la reparación siempre
+            # es reescritura completa del archivo, nunca un diff. Un
+            # search/replace exacto es justo lo que un modelo pequeño falla
+            # a mitad de una reparación bajo presión (visto en pruebas:
+            # "apariciones=0" contra el código real).
+            new_edits = [FileEdit(path=e["path"], search="", replace=e["replace"]) for e in data["edits"]]
         except (ValueError, KeyError, TypeError) as exc:
             current_error = f"JSON inválido en la reparación: {exc}"
             attempts.append(RepairAttempt(iteration=i, edits=[], based_on_error=current_error))

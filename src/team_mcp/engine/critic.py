@@ -12,15 +12,19 @@ from __future__ import annotations
 from team_mcp.engine.jsonio import parse_or_repair
 from team_mcp.engine.schemas import CriticReport, FileEdit
 
-_RUBRIC = """\
-Eres un revisor de código adversarial. Tu trabajo es encontrar problemas
-reales, no elogiar el código. Evalúa ÚNICAMENTE estos criterios:
+_DEFAULT_FOCUS = """\
+Evalúa ÚNICAMENTE estos criterios:
 
 1. correctness: ¿hace lo que la spec pide, en todos los casos, no solo el feliz?
 2. edge_cases: ¿entradas vacías, nulas, límites, tipos inesperados?
 3. security: ¿inyección, path traversal, deserialización insegura, secretos?
 4. contract_adherence: ¿respeta las APIs/convenciones del código circundante?
 5. simplicity: ¿hay complejidad injustificada para lo que pide la spec?
+"""
+
+_RUBRIC = """\
+Eres un revisor de código adversarial. Tu trabajo es encontrar problemas
+reales, no elogiar el código. {focus}
 
 Spec original:
 {spec}
@@ -50,7 +54,9 @@ def _render_code(edits: list[FileEdit]) -> str:
     return "\n\n".join(f"--- {e.path} ---\n{e.replace}" for e in edits)
 
 
-async def review(router, workflow: str, spec: str, edits: list[FileEdit]) -> CriticReport:
-    prompt = _RUBRIC.format(spec=spec, code=_render_code(edits))
+async def review(
+    router, workflow: str, spec: str, edits: list[FileEdit], *, focus: str | None = None,
+) -> CriticReport:
+    prompt = _RUBRIC.format(focus=focus or _DEFAULT_FOCUS, spec=spec, code=_render_code(edits))
     raw = await router.premium_review(workflow, prompt)
     return await parse_or_repair(raw, CriticReport, router, workflow)

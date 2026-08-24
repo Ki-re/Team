@@ -60,6 +60,12 @@ model_list:
       api_key: os.environ/GEMINI_API_KEY
   - model_name: tier-context
     litellm_params:
+      # confirmado con respuesta real el 2026-08-24; gemini-flash-latest a
+      # veces da 503 "high demand" (transitorio), esta es la red de respaldo.
+      model: gemini/gemini-3.1-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-context
+    litellm_params:
       # 1M de contexto real, confirmado en el listado de OpenRouter.
       model: openrouter/nvidia/nemotron-3.5-lightning:free
       # sin OPENROUTER_KEY_CONTEXT propia: una key de OpenRouter no está
@@ -72,9 +78,24 @@ model_list:
   # se usa cuando agy falla/no responde, vía el gateway. Reutiliza
   # GEMINI_API_KEY (misma cuenta de AI Studio que tier-context) en vez de
   # pedir una key separada.
+  #
+  # IMPORTANTE (verificado 2026-08-24 con petición directa a la API): esta
+  # cuenta/proyecto tiene cuota gratuita = 0 para el modelo gemini-3.1-pro
+  # (tanto gemini-pro-latest como gemini-3.1-pro-preview apuntan a la misma
+  # cuota agotada-por-diseño: "limit: 0"). No es un tema de uso, es que el
+  # proyecto de Google Cloud no tiene habilitado el free tier de Pro — se
+  # arregla activando facturación en la cuenta (fuera del alcance de este
+  # config), no reintentando ni cambiando de nombre de modelo. Se deja como
+  # primer intento por si se activa más adelante; el segundo entry
+  # (flash-lite, con cuota real confirmada) es la red de seguridad para que
+  # esta ruta de emergencia nunca se quede muerta entre tanto.
   - model_name: tier-premium
     litellm_params:
-      model: gemini/gemini-pro-latest
+      model: gemini/gemini-3.1-pro-preview
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-premium
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
 
 router_settings:

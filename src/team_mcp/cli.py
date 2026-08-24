@@ -62,6 +62,7 @@ def main() -> None:
     p_run.add_argument("--target-path")
     p_run.add_argument("--target-paths", nargs="*", default=None)
     p_run.add_argument("--kind", choices=["new", "refactor", "fix", "review"])
+    p_run.add_argument("--repro-command")
     p_run.add_argument("--scope")
     p_run.add_argument("--scope-paths", nargs="*", default=None)
     p_run.add_argument("--question")
@@ -102,6 +103,7 @@ def main() -> None:
                     "spec": args.spec,
                     "target_paths": args.target_paths or [],
                     "kind": args.kind,
+                    "repro_command": args.repro_command,
                 }
             elif args.tool == "team_ask":
                 kwargs = {"question": args.question, "scope_paths": args.scope_paths or []}

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,7 +41,7 @@ def _parses(py_files: list[str], workdir: Path) -> tuple[bool, str]:
 def _lint(workdir: Path, timeout_s: float) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
-            ["ruff", "check", "."],
+            [sys.executable, "-m", "ruff", "check", "."],  # nunca depender de "ruff" en el PATH
             cwd=workdir, capture_output=True, text=True, timeout=timeout_s, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
