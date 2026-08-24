@@ -1,0 +1,93 @@
+# Gateway LiteLLM — "Team"
+#
+# 4 tiers expuestos como model_name lógicos. El servidor MCP solo conoce estos
+# 4 nombres; el roster concreto de proveedores por debajo es intercambiable
+# aquí sin tocar el MCP. El pipeline `selftest` es la fuente de verdad sobre
+# qué modelos siguen vivos/gratis — esta lista es un punto de partida
+# razonable a fecha de despliegue y debe revisarse si algún tier degrada.
+#
+# tier-premium aquí = SOLO el fallback API (Gemini Pro). `agy` (Antigravity
+# CLI) es la vía por defecto del tier premium y se invoca directamente desde
+# el MCP (providers/agy.py) por subprocess, fuera de LiteLLM. Cuando agy
+# falla, el MCP cae a este model group.
+
+model_list:
+  # ---------------- tier-fast: atómico, JSON repair, clasificación ----------------
+  - model_name: tier-fast
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: tier-fast
+    litellm_params:
+      model: groq/gemma2-9b-it
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: tier-fast
+    litellm_params:
+      model: cerebras/llama3.1-8b
+      api_key: os.environ/CEREBRAS_API_KEY
+
+  # ---------------- tier-coder: generación/refactor de código ----------------
+  # 3 keys de OpenRouter en round-robin sobre el mismo modelo, más un segundo
+  # modelo coder como diversidad para el fan-out de consenso.
+  - model_name: tier-coder
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
+      api_key: os.environ/OPENROUTER_KEY_1
+  - model_name: tier-coder
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
+      api_key: os.environ/OPENROUTER_KEY_2
+  - model_name: tier-coder
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
+      api_key: os.environ/OPENROUTER_KEY_3
+  - model_name: tier-coder
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat-v3.1:free
+      api_key: os.environ/OPENROUTER_KEY_1
+
+  # ---------------- tier-context: ventanas 1M+, logs/docs enormes ----------------
+  - model_name: tier-context
+    litellm_params:
+      model: gemini/gemini-2.0-flash-exp
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-context
+    litellm_params:
+      model: openrouter/meta-llama/llama-4-scout:free
+      api_key: os.environ/OPENROUTER_KEY_CONTEXT
+
+  # ---------------- tier-premium: SOLO fallback API (agy es la vía primaria) ----------------
+  - model_name: tier-premium
+    litellm_params:
+      model: gemini/gemini-1.5-pro
+      api_key: os.environ/GEMINI_PRO_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  # una key/modelo que falla repetidamente sale del pool temporalmente
+  allowed_fails: 2
+  cooldown_time: 60
+  num_retries: 2
+  timeout: 120
+  redis_host: redis
+  redis_port: 6379
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  # cascada de fallback: si tier-coder se agota, degrada a tier-fast antes de
+  # rendirse; tier-context cae a tier-premium (gemini-pro) para no perder la
+  # tarea aunque salga más caro/lento.
+  fallbacks:
+    - tier-coder: ["tier-fast"]
+    - tier-context: ["tier-premium"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  salt_key: os.environ/LITELLM_SALT_KEY
+  database_url: os.environ/DATABASE_URL
+  ui_username: os.environ/UI_USERNAME
+  ui_password: os.environ/UI_PASSWORD
+  # permite añadir/editar modelos y virtual keys desde /ui sin reiniciar,
+  # persistido en Postgres, tal como se pidió.
+  store_model_in_db: true

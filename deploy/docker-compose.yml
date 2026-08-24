@@ -1,0 +1,75 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: team-litellm
+    restart: unless-stopped
+    ports:
+      # 0.0.0.0 a propósito: la UI/API debe ser accesible desde fuera del
+      # servidor (LAN). No exponer este puerto a Internet sin un reverse
+      # proxy TLS delante.
+      - "4000:4000"
+    volumes:
+      - ./litellm.config.yaml:/app/config.yaml:ro
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # la imagen no trae wget/curl; usamos el python del propio venv de la app
+      test: ["CMD", "/app/.venv/bin/python3", "-c",
+             "import urllib.request as u; u.urlopen('http://localhost:4000/health/liveliness', timeout=4)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          # 768M no bastaba: el primer arranque (migraciones Prisma +
+          # registro de ~8 modelos + query-engine) llegó a rozar el límite
+          # y estuvo a punto de OOM-kill. 1400M da margen real.
+          memory: 1400M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: team-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  redis:
+    image: redis:7-alpine
+    container_name: team-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 160M
+
+volumes:
+  postgres_data:

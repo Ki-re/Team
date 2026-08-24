@@ -1,0 +1,36 @@
+# secrets — nunca deben entrar al repo
+ssh_key
+ssh_key.pub
+deploy/.env
+.env
+*.pem
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# sqlite / ledger local
+*.db
+*.sqlite3
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs y artefactos de sandbox en tiempo de ejecución
+.team_sandbox/
+*.log
+
+# estado local de Claude Code, no es parte del proyecto
+.claude/
