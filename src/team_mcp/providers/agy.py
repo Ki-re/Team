@@ -77,14 +77,14 @@ class PremiumProvider:
                 "path": self._agy_path,
                 "output": (stdout or stderr).decode(errors="replace").strip()[:200],
             }
-        except (OSError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, OSError) as exc:
             return {"agy": False, "path": self._agy_path, "reason": str(exc)}
 
     async def complete(self, prompt: str, *, timeout: float = 180.0) -> str:
         if self._agy_path:
             try:
                 return await self._run_agy(prompt, timeout=timeout)
-            except (OSError, asyncio.TimeoutError, RuntimeError):
+            except (TimeoutError, OSError, RuntimeError):
                 pass  # degrada a fallback silenciosamente; queda anotado en last_used
 
         self.last_used = "fallback"
@@ -111,7 +111,7 @@ class PremiumProvider:
         )
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             raise
 

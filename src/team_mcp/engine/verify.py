@@ -41,7 +41,7 @@ def _lint(workdir: Path, timeout_s: float) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
             ["ruff", "check", "."],
-            cwd=workdir, capture_output=True, text=True, timeout=timeout_s,
+            cwd=workdir, capture_output=True, text=True, timeout=timeout_s, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         return True, f"ruff no disponible/timeout, se omite: {exc}"
@@ -78,7 +78,7 @@ async def verify_candidate(target: VerifyTarget) -> VerificationResult:
 def _run_tests(cmd: list[str], workdir: Path, timeout_s: float) -> tuple[int, int, str]:
     try:
         proc = subprocess.run(
-            cmd, cwd=workdir, capture_output=True, text=True, timeout=timeout_s,
+            cmd, cwd=workdir, capture_output=True, text=True, timeout=timeout_s, check=False,
         )
     except subprocess.TimeoutExpired as exc:
         return 0, 0, f"timeout tras {timeout_s}s: {exc}"

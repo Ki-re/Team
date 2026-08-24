@@ -81,22 +81,34 @@ class Sandbox:
         return changed
 
     def _apply_one(self, target: Path, edit: FileEdit) -> None:
-        if edit.search == "":
-            # archivo nuevo
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(edit.replace, encoding="utf-8")
-            return
+        _apply_edit_unchecked(target, edit)
 
-        if not target.exists():
-            raise EditConflict(f"{target}: no existe y el edit no es de archivo nuevo")
+    def materialize_edits(self, edits: list[FileEdit], into: Path) -> None:
+        """Aplica `edits` directamente sobre `into` (ya asumido seguro/scratch,
+        sin pasar por la whitelist). Usado por consensus.py para construir
+        cada celda de la matriz cruzada sin tocar el sandbox real."""
+        for edit in edits:
+            target = into / edit.path
+            _apply_edit_unchecked(target, edit)
 
-        current = target.read_text(encoding="utf-8")
-        if current.count(edit.search) != 1:
-            raise EditConflict(
-                f"{target}: el bloque `search` no aparece exactamente una vez "
-                f"(apariciones={current.count(edit.search)})"
-            )
-        target.write_text(current.replace(edit.search, edit.replace, 1), encoding="utf-8")
+
+def _apply_edit_unchecked(target: Path, edit: FileEdit) -> None:
+    if edit.search == "":
+        # archivo nuevo
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(edit.replace, encoding="utf-8")
+        return
+
+    if not target.exists():
+        raise EditConflict(f"{target}: no existe y el edit no es de archivo nuevo")
+
+    current = target.read_text(encoding="utf-8")
+    if current.count(edit.search) != 1:
+        raise EditConflict(
+            f"{target}: el bloque `search` no aparece exactamente una vez "
+            f"(apariciones={current.count(edit.search)})"
+        )
+    target.write_text(current.replace(edit.search, edit.replace, 1), encoding="utf-8")
 
     def workdir_copy(self, source_paths: list[str], into: Path) -> Path:
         """Copia archivos a un scratch dir para que los workers experimenten

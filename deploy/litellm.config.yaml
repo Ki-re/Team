@@ -6,6 +6,12 @@
 # qué modelos siguen vivos/gratis — esta lista es un punto de partida
 # razonable a fecha de despliegue y debe revisarse si algún tier degrada.
 #
+# IDs verificados en vivo el 2026-08-24 contra el /models de cada proveedor
+# (Groq, Cerebras, Gemini y OpenRouter renombran/retiran modelos con
+# frecuencia; los nombres "obvios" de hace unos meses ya no existían). Si
+# algún tier empieza a devolver 404, repetir esa consulta antes de adivinar
+# un nombre nuevo — ver README "Verificación end-to-end".
+#
 # tier-premium aquí = SOLO el fallback API (Gemini Pro). `agy` (Antigravity
 # CLI) es la vía por defecto del tier premium y se invoca directamente desde
 # el MCP (providers/agy.py) por subprocess, fuera de LiteLLM. Cuando agy
@@ -15,52 +21,61 @@ model_list:
   # ---------------- tier-fast: atómico, JSON repair, clasificación ----------------
   - model_name: tier-fast
     litellm_params:
-      model: groq/llama-3.1-8b-instant
+      model: groq/openai/gpt-oss-20b
       api_key: os.environ/GROQ_API_KEY
   - model_name: tier-fast
     litellm_params:
-      model: groq/gemma2-9b-it
+      model: groq/qwen/qwen3.6-27b
       api_key: os.environ/GROQ_API_KEY
   - model_name: tier-fast
     litellm_params:
-      model: cerebras/llama3.1-8b
+      model: cerebras/gpt-oss-120b
       api_key: os.environ/CEREBRAS_API_KEY
 
   # ---------------- tier-coder: generación/refactor de código ----------------
-  # 3 keys de OpenRouter en round-robin sobre el mismo modelo, más un segundo
-  # modelo coder como diversidad para el fan-out de consenso.
+  # 4 familias de modelo distintas (Cohere, Zhipu/GLM, Nvidia, Mistral) en
+  # vez de la misma familia repetida con distintas keys: la diversidad real
+  # de familia es lo que hace útil la matriz de consenso cruzado.
   - model_name: tier-coder
     litellm_params:
-      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
+      model: openrouter/cohere/north-mini-code:free
       api_key: os.environ/OPENROUTER_KEY_1
   - model_name: tier-coder
     litellm_params:
-      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
+      model: openrouter/z-ai/glm-5.2:free
       api_key: os.environ/OPENROUTER_KEY_2
   - model_name: tier-coder
     litellm_params:
-      model: openrouter/qwen/qwen-2.5-coder-32b-instruct:free
-      api_key: os.environ/OPENROUTER_KEY_3
+      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      api_key: os.environ/OPENROUTER_KEY_1
   - model_name: tier-coder
     litellm_params:
-      model: openrouter/deepseek/deepseek-chat-v3.1:free
-      api_key: os.environ/OPENROUTER_KEY_1
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_KEY
 
   # ---------------- tier-context: ventanas 1M+, logs/docs enormes ----------------
   - model_name: tier-context
     litellm_params:
-      model: gemini/gemini-2.0-flash-exp
+      model: gemini/gemini-flash-latest
       api_key: os.environ/GEMINI_API_KEY
   - model_name: tier-context
     litellm_params:
-      model: openrouter/meta-llama/llama-4-scout:free
-      api_key: os.environ/OPENROUTER_KEY_CONTEXT
+      # 1M de contexto real, confirmado en el listado de OpenRouter.
+      model: openrouter/nvidia/nemotron-3.5-lightning:free
+      # sin OPENROUTER_KEY_CONTEXT propia: una key de OpenRouter no está
+      # atada a un tier, así que reutilizamos la de tier-coder.
+      api_key: os.environ/OPENROUTER_KEY_1
 
   # ---------------- tier-premium: SOLO fallback API (agy es la vía primaria) ----------------
+  # agy (Antigravity CLI) NO usa API key — corre por subprocess con el login
+  # de la cuenta Google Pro del usuario (providers/agy.py). Esta entrada solo
+  # se usa cuando agy falla/no responde, vía el gateway. Reutiliza
+  # GEMINI_API_KEY (misma cuenta de AI Studio que tier-context) en vez de
+  # pedir una key separada.
   - model_name: tier-premium
     litellm_params:
-      model: gemini/gemini-1.5-pro
-      api_key: os.environ/GEMINI_PRO_API_KEY
+      model: gemini/gemini-pro-latest
+      api_key: os.environ/GEMINI_API_KEY
 
 router_settings:
   routing_strategy: simple-shuffle

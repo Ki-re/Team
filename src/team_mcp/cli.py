@@ -79,6 +79,11 @@ def main() -> None:
     config = load_config()
     ledger = Ledger(config)
 
+    spec_original = None
+    if args.cmd == "run" and args.tool == "team_validate" and args.spec_file:
+        with open(args.spec_file, encoding="utf-8") as f:
+            spec_original = f.read()
+
     async def _main() -> None:
         router = Router(config, ledger)
         try:
@@ -101,10 +106,6 @@ def main() -> None:
             elif args.tool == "team_ask":
                 kwargs = {"question": args.question, "scope_paths": args.scope_paths or []}
             elif args.tool == "team_validate":
-                spec_original = None
-                if args.spec_file:
-                    with open(args.spec_file, encoding="utf-8") as f:
-                        spec_original = f.read()
                 kwargs = {"scope": args.scope, "spec_original": spec_original}
             elif args.tool == "team_epic":
                 kwargs = {"plan": [], "budget": None}
