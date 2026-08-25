@@ -7,7 +7,6 @@ aplicarse de verdad.
 
 from __future__ import annotations
 
-import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -109,14 +108,3 @@ def _apply_edit_unchecked(target: Path, edit: FileEdit) -> None:
             f"(apariciones={current.count(edit.search)})"
         )
     target.write_text(current.replace(edit.search, edit.replace, 1), encoding="utf-8")
-
-    def workdir_copy(self, source_paths: list[str], into: Path) -> Path:
-        """Copia archivos a un scratch dir para que los workers experimenten
-        sin tocar el sandbox real (usado por el fan-out de consenso)."""
-        into.mkdir(parents=True, exist_ok=True)
-        for raw in source_paths:
-            src = self._check_path(Path(raw))
-            if src.exists():
-                dst = into / src.name
-                shutil.copy2(src, dst)
-        return into

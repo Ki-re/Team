@@ -24,12 +24,31 @@ class JsonExtractionError(ValueError):
 def extract_json(raw: str) -> dict | list:
     obj_match = re.search(r"\{.*\}", raw, re.DOTALL)
     arr_match = re.search(r"\[.*\]", raw, re.DOTALL)
-    candidates = [m for m in (obj_match, arr_match) if m]
+    candidates = [m.group(0) for m in (obj_match, arr_match) if m]
     if not candidates:
         raise JsonExtractionError(f"sin JSON en la respuesta del modelo: {raw[:200]}")
-    # el más largo suele ser el objeto/array real, no un fragmento anidado suelto
-    best = max(candidates, key=lambda m: len(m.group(0)))
-    return json.loads(best.group(0))
+
+    # el regex es greedy: si hay un array suelto ANTES de un objeto real (o
+    # viceversa), el match del array se extiende hasta el último `]` del
+    # texto, cruzando por encima del objeto y produciendo un slice inválido
+    # (visto fallar en tests). Por eso no basta con "el más largo" a ciegas:
+    # se intenta parsear cada candidato y solo se compara longitud entre los
+    # que de verdad son JSON válido.
+    parsed: list[tuple[str, object]] = []
+    last_error: Exception | None = None
+    for text in candidates:
+        try:
+            parsed.append((text, json.loads(text)))
+        except json.JSONDecodeError as exc:
+            last_error = exc
+
+    if not parsed:
+        raise JsonExtractionError(
+            f"JSON encontrado pero no parsea ({last_error}): {raw[:200]}"
+        )
+
+    _, best_value = max(parsed, key=lambda pair: len(pair[0]))
+    return best_value
 
 
 async def parse_or_repair(raw: str, schema: type[T], router, workflow: str) -> T:

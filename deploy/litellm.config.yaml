@@ -27,10 +27,11 @@ model_list:
     litellm_params:
       model: groq/qwen/qwen3.6-27b
       api_key: os.environ/GROQ_API_KEY
-  - model_name: tier-fast
-    litellm_params:
-      model: cerebras/gpt-oss-120b
-      api_key: os.environ/CEREBRAS_API_KEY
+  # cerebras/gpt-oss-120b quitado el 2026-08-25: confirmado en vivo que la
+  # cuenta entera devuelve 402 "Payment required" (probado también con
+  # gemma-4-31b, mismo error — no es el modelo, es que el free tier de la
+  # cuenta se acabó). selftest lo detectó; se necesitaría una key nueva o
+  # facturación para reactivarlo, fuera de lo que se puede hacer aquí.
 
   # ---------------- tier-coder: generación/refactor de código ----------------
   # 4 familias de modelo distintas (Cohere, Zhipu/GLM, Nvidia, Mistral) en

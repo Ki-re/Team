@@ -13,13 +13,24 @@ Ver el plan completo de diseño en `.claude/plans` (o pedir un resumen).
   UI en `http://203.0.113.10:4000/ui`.
 - **Servidor MCP**: registrado globalmente en Claude Code (`claude mcp add team --scope user`),
   disponible en cualquier proyecto, no solo este repo.
-- **Fases 1-4 y 6-7 completas y verificadas en vivo** contra el gateway real (ver
-  `.claude/plans` para el detalle): los 4 tiers responden, `team_task` y los 4
-  `kind` de `team_feature` (`new`/`refactor`/`fix`/`review`) producen código
-  real con tests en verde, `team_ask` tiene map-reduce con verificación de
-  citas + búsqueda web opcional (Tavily, vía MCP Gateway de LiteLLM).
-- **Pendiente (Fase 5)**: `team_epic`, `team_validate`, `selftest` siguen como
-  stubs.
+- **Las 5 tools completas y verificadas en vivo** contra el gateway real (ver
+  `.claude/plans` para el detalle, Fases 1-9): `team_task`, los 4 `kind` de
+  `team_feature` (`new`/`refactor`/`fix`/`review`), `team_ask` (map-reduce +
+  citas + búsqueda web opcional vía Tavily), `team_epic` (DAG con
+  dependencias y presupuesto real) y `team_validate` (GO/NO-GO + `selftest`).
+  Ninguna es un stub.
+- **Suite de tests propia**: `tests/unit/` (64 tests, `pytest`) sobre toda
+  la lógica determinista/local — sandbox, verify, consenso, reparación,
+  parseo JSON, el DAG de `team_epic`, `team_validate`, config. Los caminos
+  con modelos en vivo se siguen verificando manualmente contra el gateway
+  real, no en esta suite (mockear o gastar cuota en cada corrida sería el
+  trade-off equivocado en este punto del proyecto).
+- **`selftest` programado**: tarea semanal (`team-mcp-selftest`, lunes por
+  la mañana) que corre los 4 tiers y reporta si alguno se degrada — no hace
+  falta acordarse de correrlo a mano.
+- **Skill global**: `~/.claude/skills/team/SKILL.md` — referencia rápida
+  de las 5 tools, descubrible en cualquier sesión de Claude Code, no solo
+  vía `CLAUDE.md`.
 
 ## Estructura
 
