@@ -102,11 +102,18 @@ model_list:
 # Solo usado por team_ask (allow_web_search=True) sobre tier-context. Nada
 # que escribe código (team_task/team_feature/team_epic) toca esto — dar
 # tool-use en vivo a un worker que genera código sería una vía de escape a
-# la jaula de sandbox.py. Esquema verificado contra docs.litellm.ai/docs/mcp
-# a la fecha de escritura; revisar si LiteLLM cambia el formato.
+# la jaula de sandbox.py.
+#
+# Servidor MCP remoto de Tavily (hospedado por ellos, no autohospedado —
+# Brave exige tarjeta de crédito incluso para el free tier; Tavily da
+# 1000 créditos/mes que se renuevan, sin tarjeta). La key va DENTRO de la
+# URL completa como query param (así es como Tavily espera su MCP
+# hospedado); por eso TAVILY_MCP_URL guarda la URL entera, no solo la key
+# — la sustitución os.environ/VAR de LiteLLM reemplaza el valor completo
+# del campo, no fragmentos dentro de una cadena mayor.
 mcp_servers:
-  web_search:
-    url: "http://mcp-websearch:8090/mcp"  # nombre del servicio docker, red interna
+  tavily:
+    url: os.environ/TAVILY_MCP_URL
 
 router_settings:
   routing_strategy: simple-shuffle

@@ -73,9 +73,9 @@ class Router:
 
     async def context_with_tools(self, workflow: str, prompt: str) -> str:
         """Como `context()`, pero con acceso a las tools MCP registradas en
-        el gateway (hoy: solo `web_search`, ver Fase 7 del plan). Solo
-        tier-context: es donde el tool-calling es fiable con los modelos
-        gratis actuales."""
+        el gateway (hoy: solo Tavily —search/extract/map/crawl—, ver Fase 7
+        del plan). Solo tier-context: es donde el tool-calling es fiable
+        con los modelos gratis actuales."""
         t0 = time.monotonic()
         # require_approval: "never" es imprescindible — sin él LiteLLM
         # devuelve la function_call pendiente de aprobación humana en vez
@@ -84,7 +84,7 @@ class Router:
         # la tool de verdad, ver tool_execution_results en la respuesta).
         tools = [{
             "type": "mcp", "server_url": "litellm_proxy",
-            "server_label": "web_search", "require_approval": "never",
+            "server_label": "tavily", "require_approval": "never",
         }]
         try:
             result = await self.gateway.respond_with_tools(

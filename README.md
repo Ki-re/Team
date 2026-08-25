@@ -11,7 +11,15 @@ Ver el plan completo de diseño en `.claude/plans` (o pedir un resumen).
 
 - **Gateway LiteLLM**: desplegado en `203.0.113.10:4000` (Docker: litellm + postgres + redis).
   UI en `http://203.0.113.10:4000/ui`.
-- **Servidor MCP**: en desarrollo. `team_task` es el primer entrypoint funcional.
+- **Servidor MCP**: registrado globalmente en Claude Code (`claude mcp add team --scope user`),
+  disponible en cualquier proyecto, no solo este repo.
+- **Fases 1-4 y 6-7 completas y verificadas en vivo** contra el gateway real (ver
+  `.claude/plans` para el detalle): los 4 tiers responden, `team_task` y los 4
+  `kind` de `team_feature` (`new`/`refactor`/`fix`/`review`) producen código
+  real con tests en verde, `team_ask` tiene map-reduce con verificación de
+  citas + búsqueda web opcional (Tavily, vía MCP Gateway de LiteLLM).
+- **Pendiente (Fase 5)**: `team_epic`, `team_validate`, `selftest` siguen como
+  stubs.
 
 ## Estructura
 
@@ -48,15 +56,26 @@ redesplegando, o directamente desde la UI web (`/ui`) sin reiniciar nada.
 ~3-4 minutos (migraciones Prisma + registro de ~8 modelos) en el servidor
 actual (2 GB RAM). No es un cuelgue; `docker logs -f team-litellm` lo muestra.
 
-## Registrar el MCP en Claude Desktop / Claude Code
+## Registrar el MCP en Claude Code (global, cualquier proyecto)
 
+```bash
+claude mcp add team --scope user -- "C:\Users\Kire\Documents\GitHub\Team\.venv\Scripts\python.exe" -m team_mcp.server
+claude mcp list   # debe mostrar "team ... Connected"
+```
+
+Importante: la ruta al intérprete debe ser la del `.venv` de este repo
+(no `python` a secas) — es donde está instalado el paquete `team_mcp` en
+modo editable. `.env` se carga siempre desde la raíz de este repo
+(`config.py::load_env`), sin importar desde qué proyecto se invoque el
+servidor.
+
+Para Claude Desktop, el equivalente manual en su config JSON:
 ```json
 {
   "mcpServers": {
     "team": {
-      "command": "python",
-      "args": ["-m", "team_mcp.server"],
-      "cwd": "C:\\Users\\Kire\\Documents\\GitHub\\Team"
+      "command": "C:\\Users\\Kire\\Documents\\GitHub\\Team\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "team_mcp.server"]
     }
   }
 }
