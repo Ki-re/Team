@@ -47,6 +47,12 @@ async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwarg
 
 
 def main() -> None:
+    # los manifiestos pueden contener texto generado por modelos con
+    # cualquier carácter Unicode (visto crashear con "≈" contra la consola
+    # cp1252 de Windows) — la consola por defecto no lo soporta, forzamos
+    # utf-8 con fallback seguro en vez de confiar en la codificación del SO.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(prog="team_mcp.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -66,6 +72,9 @@ def main() -> None:
     p_run.add_argument("--question")
     p_run.add_argument("--spec-file")
     p_run.add_argument("--allow-web-search", action="store_true")
+    p_run.add_argument("--plan-file", help="JSON con la lista de nodos para team_epic")
+    p_run.add_argument("--budget", type=int, default=None)
+    p_run.add_argument("--selftest", action="store_true")
     p_run.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
@@ -83,6 +92,11 @@ def main() -> None:
     if args.cmd == "run" and args.tool == "team_validate" and args.spec_file:
         with open(args.spec_file, encoding="utf-8") as f:
             spec_original = f.read()
+
+    epic_plan: list[dict] = []
+    if args.cmd == "run" and args.tool == "team_epic" and args.plan_file:
+        with open(args.plan_file, encoding="utf-8") as f:
+            epic_plan = json.load(f)
 
     async def _main() -> None:
         router = Router(config, ledger)
@@ -111,9 +125,13 @@ def main() -> None:
                     "allow_web_search": args.allow_web_search,
                 }
             elif args.tool == "team_validate":
-                kwargs = {"scope": args.scope, "spec_original": spec_original}
+                kwargs = {
+                    "scope": args.scope,
+                    "spec_original": spec_original,
+                    "selftest": args.selftest,
+                }
             elif args.tool == "team_epic":
-                kwargs = {"plan": [], "budget": None}
+                kwargs = {"plan": epic_plan, "budget": args.budget}
 
             await _run_workflow(router, ledger, config, args.tool, kwargs)
         finally:

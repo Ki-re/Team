@@ -1,7 +1,7 @@
-from playground.add import add
+from epic_x import square
 
-def test_add():
-    assert add(1, 2) == 3
-    assert add(-1, 1) == 0
-    assert add(0, 0) == 0
-    assert add(2.5, 1.5) == 4.0
+def test_square():
+    assert square(3) == 9
+    assert square(0) == 0
+    assert square(-2) == 4
+    assert square(5.5) == 30.25
