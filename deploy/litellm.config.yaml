@@ -12,10 +12,24 @@
 # algún tier empieza a devolver 404, repetir esa consulta antes de adivinar
 # un nombre nuevo — ver README "Verificación end-to-end".
 #
-# tier-premium aquí = SOLO el fallback API (Gemini Pro). `agy` (Antigravity
-# CLI) es la vía por defecto del tier premium y se invoca directamente desde
-# el MCP (providers/agy.py) por subprocess, fuera de LiteLLM. Cuando agy
-# falla, el MCP cae a este model group.
+# Roster de Gemini reescrito el 2026-08-26 a partir del panel REAL de
+# cuotas del usuario (ai.dev/rate-limit), no solo del /models público:
+# los "Flash Lite" (3.1 y 3.5) tienen RPD=500/RPM=15, los "Flash" a secas
+# (3, 3.5, 3.6, 3.7) solo RPD=20/RPM=5 — 25x menos. Por eso los Lite son
+# la columna vertebral y los demás solo diversidad/desbordamiento. Gemini
+# Pro tiene RPD=0/RPM=0 en esta cuenta (confirmado dos veces, persistente,
+# no transitorio) — no vale la pena tenerlo en el pool, cada intento es un
+# fallo seguro; ver providers/agy.py para la vía real a capacidad "Pro"
+# (la suscripción Google Pro del usuario, fuera de esta key de API).
+#
+# tier-premium aquí = SOLO el fallback API. `agy` (Antigravity CLI) es la
+# vía por defecto del tier premium y se invoca directamente desde el MCP
+# (providers/agy.py) por subprocess, fuera de LiteLLM — por eso el
+# fallback agy->API no puede vivir en `fallbacks:` de más abajo (esa
+# sección solo encadena model groups DENTRO del proxy) y se implementa a
+# mano en Python. Desde 2026-08-26, agy también se usa para reparar código
+# cuando el bucle de tier-coder se estanca (engine/repair.py) — tiene
+# mucha más cuota real (la suscripción del usuario) que el pool gratuito.
 
 model_list:
   # ---------------- tier-fast: atómico, JSON repair, clasificación ----------------
@@ -27,11 +41,20 @@ model_list:
     litellm_params:
       model: groq/qwen/qwen3.6-27b
       api_key: os.environ/GROQ_API_KEY
+  - model_name: tier-fast
+    litellm_params:
+      # RPM=30 / RPD=14400 en el panel real del usuario — el mayor margen
+      # diario de todo el roster, ideal para tareas atómicas repetidas.
+      # TPM=16K es bajo (no sirve para prompts largos, pero tier-fast no
+      # los tiene). Cuenta de Gemini, no de Cerebras (ese sí sigue muerto).
+      model: gemini/gemma-4-31b-it
+      api_key: os.environ/GEMINI_API_KEY
   # cerebras/gpt-oss-120b quitado el 2026-08-25: confirmado en vivo que la
   # cuenta entera devuelve 402 "Payment required" (probado también con
-  # gemma-4-31b, mismo error — no es el modelo, es que el free tier de la
-  # cuenta se acabó). selftest lo detectó; se necesitaría una key nueva o
-  # facturación para reactivarlo, fuera de lo que se puede hacer aquí.
+  # gemma-4-31b vía Cerebras, mismo error — no es el modelo, es que el free
+  # tier de la cuenta se acabó). selftest lo detectó; se necesitaría una
+  # key nueva o facturación para reactivarlo, fuera de lo que se puede
+  # hacer aquí.
 
   # ---------------- tier-coder: generación/refactor de código ----------------
   # 4 familias de modelo distintas (Cohere, Zhipu/GLM, Nvidia, Mistral) en
@@ -55,19 +78,30 @@ model_list:
       api_key: os.environ/MISTRAL_KEY
 
   # ---------------- tier-context: ventanas 1M+, logs/docs enormes ----------------
+  # Los dos "Flash Lite" primero (RPD=500 cada uno en el panel real del
+  # usuario): son la columna vertebral real. Los "Flash" a secas después,
+  # como diversidad/desbordamiento — RPD=20 cada uno, pero cada modelo es
+  # un cubo de cuota INDEPENDIENTE, así que sí suman capacidad agregada.
   - model_name: tier-context
     litellm_params:
-      model: gemini/gemini-flash-latest
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-context
-    litellm_params:
-      # confirmado con respuesta real el 2026-08-24; gemini-flash-latest a
-      # veces da 503 "high demand" (transitorio), esta es la red de respaldo.
       model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
   - model_name: tier-context
     litellm_params:
-      # 1M de contexto real, confirmado en el listado de OpenRouter.
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-context
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-context
+    litellm_params:
+      model: gemini/gemini-3.7-flash
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-context
+    litellm_params:
+      # 1M de contexto real, confirmado en el listado de OpenRouter — y un
+      # proveedor totalmente distinto, no comparte cuota con nada de arriba.
       model: openrouter/nvidia/nemotron-3.5-lightning:free
       # sin OPENROUTER_KEY_CONTEXT propia: una key de OpenRouter no está
       # atada a un tier, así que reutilizamos la de tier-coder.
@@ -80,23 +114,22 @@ model_list:
   # GEMINI_API_KEY (misma cuenta de AI Studio que tier-context) en vez de
   # pedir una key separada.
   #
-  # IMPORTANTE (verificado 2026-08-24 con petición directa a la API): esta
-  # cuenta/proyecto tiene cuota gratuita = 0 para el modelo gemini-3.1-pro
-  # (tanto gemini-pro-latest como gemini-3.1-pro-preview apuntan a la misma
-  # cuota agotada-por-diseño: "limit: 0"). No es un tema de uso, es que el
-  # proyecto de Google Cloud no tiene habilitado el free tier de Pro — se
-  # arregla activando facturación en la cuenta (fuera del alcance de este
-  # config), no reintentando ni cambiando de nombre de modelo. Se deja como
-  # primer intento por si se activa más adelante; el segundo entry
-  # (flash-lite, con cuota real confirmada) es la red de seguridad para que
-  # esta ruta de emergencia nunca se quede muerta entre tanto.
-  - model_name: tier-premium
-    litellm_params:
-      model: gemini/gemini-3.1-pro-preview
-      api_key: os.environ/GEMINI_API_KEY
+  # Gemini Pro (gemini-pro-latest / gemini-3.1-pro-preview) se probó y se
+  # quitó del pool el 2026-08-26: cuota real = 0/0 en el panel del usuario,
+  # confirmado persistente (no transitorio, reintentado tras 15s con el
+  # mismo error). No hay forma de arreglarlo desde este config — no lo
+  # vuelvas a añadir sin comprobar antes que el usuario activó facturación.
   - model_name: tier-premium
     litellm_params:
       model: gemini/gemini-3.1-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-premium
+    litellm_params:
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  - model_name: tier-premium
+    litellm_params:
+      model: gemini/gemini-3.6-flash
       api_key: os.environ/GEMINI_API_KEY
 
 # ---------------- MCP Gateway: tool-use para workers (Fase 7 del plan) ----------------
@@ -130,8 +163,8 @@ litellm_settings:
   drop_params: true
   set_verbose: false
   # cascada de fallback: si tier-coder se agota, degrada a tier-fast antes de
-  # rendirse; tier-context cae a tier-premium (gemini-pro) para no perder la
-  # tarea aunque salga más caro/lento.
+  # rendirse; tier-context cae a tier-premium (Flash Lite de Gemini, no Pro
+  # — ver nota arriba) para no perder la tarea aunque salga más lento.
   fallbacks:
     - tier-coder: ["tier-fast"]
     - tier-context: ["tier-premium"]
