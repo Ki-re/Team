@@ -57,9 +57,20 @@ model_list:
   # hacer aquí.
 
   # ---------------- tier-coder: generación/refactor de código ----------------
-  # 4 familias de modelo distintas (Cohere, Zhipu/GLM, Nvidia, Mistral) en
-  # vez de la misma familia repetida con distintas keys: la diversidad real
-  # de familia es lo que hace útil la matriz de consenso cruzado.
+  # Ampliado el 2026-08-27 tras diagnosticar en vivo (ledger real, ~2h de
+  # fallos entre 06:18-08:26 UTC) que tier-coder se colgaba el timeout
+  # completo (120s, cero output) — no un bug del proxy: `/health/liveliness`
+  # seguía sano, la propia llamada real a un backend concreto era la que se
+  # quedaba colgada. Con solo 4 entradas, un único modelo caído se lleva de
+  # golpe 1/4 (o 1/3, tras el fan-out inicial) de la capacidad de cada
+  # llamada. Mitigación: más familias de modelo = menos probabilidad de que
+  # el round-robin vuelva a caer justo en el que está degradado ese día.
+  # Los 4 originales quedan (diversidad de familia sigue siendo lo que hace
+  # útil la matriz de consenso cruzado); se añaden 4 más, verificados en
+  # vivo contra la API de OpenRouter directamente (no solo el catálogo)
+  # antes de añadirlos aquí — 2 candidatos más (`minimax/minimax-m2.7:free`,
+  # `google/gemma-4-26b-a4b-it:free`) dieron 429 "rate-limited upstream" en
+  # el momento de probar y se descartaron por eso, no por nombre inválido.
   - model_name: tier-coder
     litellm_params:
       model: openrouter/cohere/north-mini-code:free
@@ -76,6 +87,34 @@ model_list:
     litellm_params:
       model: mistral/codestral-latest
       api_key: os.environ/MISTRAL_KEY
+  - model_name: tier-coder
+    litellm_params:
+      # modelo de agente de código dedicado de Poolside, confirmado en vivo.
+      model: openrouter/poolside/laguna-s-2.1:free
+      api_key: os.environ/OPENROUTER_KEY_1
+  - model_name: tier-coder
+    litellm_params:
+      # variante más pequeña/rápida del mismo modelo de Poolside.
+      model: openrouter/poolside/laguna-xs-2.1:free
+      api_key: os.environ/OPENROUTER_KEY_2
+  - model_name: tier-coder
+    litellm_params:
+      model: openrouter/minimax/minimax-m3:free
+      api_key: os.environ/OPENROUTER_KEY_1
+  - model_name: tier-coder
+    litellm_params:
+      # "Free Models Router" propio de OpenRouter — NO un modelo fijo: en
+      # cada llamada selecciona al azar entre ~23 modelos gratis de su
+      # catálogo, filtrando por las features que pida la request (tool
+      # calling, structured outputs, etc.). No promete evitar backends
+      # degradados (no hay health-check documentado, confirmado vía su
+      # doc), pero al repartir sobre un pool mucho mayor que el nuestro
+      # baja la probabilidad de que CUALQUIER llamada individual caiga en
+      # el mismo modelo hundido dos veces seguidas. Verificado en vivo: una
+      # llamada de prueba resolvió a `dots-studio/dots-3-note-preview:free`,
+      # confirmando que sí enruta de verdad y no es un alias fijo.
+      model: openrouter/openrouter/free
+      api_key: os.environ/OPENROUTER_KEY_2
 
   # ---------------- tier-context: ventanas 1M+, logs/docs enormes ----------------
   # Los dos "Flash Lite" primero (RPD=500 cada uno en el panel real del

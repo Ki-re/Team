@@ -7,6 +7,15 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 ## [Unreleased]
 
 ### Added
+- `tier-coder`: 4 modelos gratuitos más de OpenRouter (`poolside/laguna-s-2.1:free`,
+  `poolside/laguna-xs-2.1:free`, `minimax/minimax-m3:free`, y el router
+  propio de OpenRouter `openrouter/free`, que reparte al azar sobre ~23
+  modelos gratis de su catálogo). Motivado por un fallo real diagnosticado
+  en vivo: ~2h de llamadas colgándose el timeout completo (120s, cero
+  output) porque el pool de solo 4 modelos tenía demasiada concentración
+  de riesgo en cualquier backend individual caído. Añadido en caliente vía
+  la API de admin de LiteLLM (sin redeploy) y verificado en vivo antes y
+  después: 10/10 llamadas reales sanas tras el cambio.
 - `update_docs`/`kb_path` opcionales en `team_feature`/`team_epic`: tras un
   cambio de código exitoso, un subagente de documentación (`docs_sync`)
   decide qué archivos de un knowledge-base en markdown (frontmatter +
