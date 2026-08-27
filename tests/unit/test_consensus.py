@@ -80,3 +80,35 @@ async def test_run_consensus_marks_trivial_test_that_everyone_passes(make_config
     monkeypatch.setattr(consensus_mod, "verify_candidate", fake_verify)
     result = await run_consensus("wf", sandbox, {}, candidates, test_command=["pytest"])
     assert set(result.trivial_tests) == {"a", "b"}
+
+
+async def test_run_consensus_survives_edit_conflict_without_raising(make_config, monkeypatch):
+    # bug real encontrado en vivo (Fase 14): un candidato cuyo `search` no
+    # encaja limpio contra el base_files (aquí: coincide DOS veces, ambiguo)
+    # hacía que sandbox.materialize_edits lanzara EditConflict SIN capturar
+    # dentro del bucle N×N, abortando team_feature entero sin manifiesto
+    # -- visto fallar contra un README real con frases repetidas.
+    sandbox = Sandbox(make_config())
+    base_files = {"readme.md": "hola mundo\nhola mundo\n"}
+
+    bad = ConsensusCandidate(
+        id="bad", model="fake",
+        edits=[FileEdit(path="readme.md", search="hola mundo", replace="adios mundo")],
+        test_edits=[FileEdit(path="test_x.py", search="", replace="def test_x():\n    assert True\n")],
+    )
+    good = ConsensusCandidate(
+        id="good", model="fake",
+        edits=[FileEdit(path="readme.md", search="", replace="hola mundo cambiado\n")],
+        test_edits=[FileEdit(path="test_x.py", search="", replace="def test_x():\n    assert True\n")],
+    )
+
+    async def fake_verify(target):
+        passed = 1 if target.candidate_id.startswith("good") else 0
+        return VerificationResult(candidate_id=target.candidate_id, parses=True, lint_ok=True, tests_run=1, tests_passed=passed)
+
+    monkeypatch.setattr(consensus_mod, "verify_candidate", fake_verify)
+
+    result = await run_consensus("wf", sandbox, base_files, [bad, good], test_command=["pytest"])
+
+    assert result.winner_id == "good"
+    assert result.scores["bad"] == 0.0

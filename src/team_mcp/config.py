@@ -78,7 +78,7 @@ def load_config(env: dict[str, str] | None = None) -> Config:
     sandbox_roots = [Path.cwd().resolve(), *_split_paths(e.get("TEAM_SANDBOX_ROOTS", ""))]
 
     return Config(
-        gateway_url=e.get("TEAM_GATEWAY_URL", "http://203.0.113.10:4000").rstrip("/"),
+        gateway_url=e.get("TEAM_GATEWAY_URL", "http://localhost:4000").rstrip("/"),
         gateway_key=e.get("TEAM_GATEWAY_KEY", ""),
         agy_path=e.get("TEAM_AGY_PATH") or None,
         agy_model=e.get("TEAM_AGY_MODEL") or None,

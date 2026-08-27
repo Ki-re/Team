@@ -9,10 +9,47 @@ Ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones. El
 documento de diseño fase a fase se mantiene localmente durante el
 desarrollo (contiene datos de cuenta del autor) y no se publica en el repo.
 
+## Arquitectura
+
+### Componentes
+Relación entre los componentes del sistema:
+```mermaid
+flowchart LR
+    Claude["Claude Desktop / Code (orquestador)"] -->|"MCP stdio, 5 tools"| MCP["team-mcp servidor Python"]
+    MCP -->|HTTP| GW["Gateway LiteLLM (Docker: litellm + postgres + redis)"]
+    MCP -->|subprocess| Agy["agy (Antigravity CLI), cuenta Google Pro del usuario"]
+    MCP --> SB["Sandbox: whitelist de rutas + escritura atómica"]
+    GW --> TF["tier-fast: Groq, Gemma"]
+    GW --> TC["tier-coder: OpenRouter, Mistral"]
+    GW --> TX["tier-context: Gemini Flash, Nemotron 1M+"]
+    GW --> TP["tier-premium fallback: Gemini Flash Lite"]
+    Agy -.->|"si falla o no esta disponible"| TP
+```
+
+### Pipeline de team_feature
+Flujo de trabajo para la implementación de funcionalidades:
+```mermaid
+flowchart TD
+    A["spec + target_paths"] --> B["Fan-out: N workers en tier-coder, temperatura alta"]
+    B --> C{"Gate deterministico: verify.py, parsea?"}
+    C -->|no| D["Candidato descartado, gratis, sin gastar mas tokens"]
+    C -->|si| E["Consenso por validacion cruzada: matriz NxN impl_i vs tests_j"]
+    E --> F["Critica adversarial: tier-premium / agy"]
+    F --> G{"Tests en rojo o hallazgo bloqueante?"}
+    G -->|no| H["Escritura atomica via Sandbox"]
+    G -->|si| I["Bucle de reparacion, maximo N iteraciones"]
+    I --> J{"Estancado o agotado?"}
+    J -->|convergio| H
+    J -->|si| K["Ultimo intento: agy, repair.py"]
+    K -->|exito| H
+    K -->|fracaso| L["Manifest: tests_status=red + motivo real del fallo"]
+    H --> M["Manifest: tests_status=green + files_changed"]
+```
+
 ## Estado
 
-- **Gateway LiteLLM**: desplegado en `203.0.113.10:4000` (Docker: litellm + postgres + redis).
-  UI en `http://203.0.113.10:4000/ui`.
+- **Gateway LiteLLM**: desplegado en `<ip-del-servidor>:4000` (Docker: litellm + postgres + redis).
+  UI en `http://<ip-del-servidor>:4000/ui`.
 - **Servidor MCP**: registrado globalmente en Claude Code (`claude mcp add team --scope user`),
   disponible en cualquier proyecto, no solo este repo.
 - **Las 5 tools completas y verificadas en vivo** contra el gateway real
@@ -66,8 +103,8 @@ cp .env.example .env        # rellenar TEAM_GATEWAY_KEY, TEAM_SANDBOX_ROOTS, etc
 
 ```bash
 # desde deploy/, con .env relleno con las API keys de cada proveedor
-scp docker-compose.yml litellm.config.yaml .env claude@203.0.113.10:~/team-gateway/
-ssh claude@203.0.113.10 "cd ~/team-gateway && docker compose up -d"
+scp docker-compose.yml litellm.config.yaml .env <usuario>@<ip-del-servidor>:~/team-gateway/
+ssh <usuario>@<ip-del-servidor> "cd ~/team-gateway && docker compose up -d"
 ```
 
 Las API keys pueden añadirse de dos formas: editando `deploy/.env` y
@@ -105,5 +142,5 @@ Para Claude Desktop, el equivalente manual en su config JSON:
 ## Verificación rápida
 
 ```bash
-curl http://203.0.113.10:4000/health/liveliness
+curl http://<ip-del-servidor>:4000/health/liveliness
 ```

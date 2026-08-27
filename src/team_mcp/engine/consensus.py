@@ -18,7 +18,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from team_mcp.engine.sandbox import Sandbox
+from team_mcp.engine.sandbox import EditConflict, Sandbox
 from team_mcp.engine.schemas import ConsensusResult, CrossMatrixCell, FileEdit
 from team_mcp.engine.verify import VerifyTarget, verify_candidate
 
@@ -92,26 +92,37 @@ async def run_consensus(
                     p.parent.mkdir(parents=True, exist_ok=True)
                     p.write_text(content, encoding="utf-8")
 
-                sandbox.materialize_edits(impl.edits, scratch)
-                sandbox.materialize_edits(tests.test_edits, scratch)
-
-                py_files = [e.path for e in impl.edits] + [e.path for e in tests.test_edits]
-                result = await verify_candidate(VerifyTarget(
-                    candidate_id=f"{impl.id}x{tests.id}", workdir=scratch,
-                    py_files=py_files, test_command=test_command, timeout_s=timeout_s,
-                ))
+                try:
+                    sandbox.materialize_edits(impl.edits, scratch)
+                    sandbox.materialize_edits(tests.test_edits, scratch)
+                except EditConflict:
+                    # un candidato cuyo `search` no encaja limpio contra el
+                    # código base (ambiguo o inexistente) no debe tumbar
+                    # TODA la matriz de consenso — antes esto propagaba y
+                    # abortaba team_feature entero sin manifiesto (visto
+                    # fallar en vivo contra un README real con frases
+                    # repetidas). Cuenta como celda sin tests corridos,
+                    # igual que un candidato que no parsea.
+                    result = None
+                else:
+                    py_files = [e.path for e in impl.edits] + [e.path for e in tests.test_edits]
+                    result = await verify_candidate(VerifyTarget(
+                        candidate_id=f"{impl.id}x{tests.id}", workdir=scratch,
+                        py_files=py_files, test_command=test_command, timeout_s=timeout_s,
+                    ))
 
             cell = CrossMatrixCell(
                 impl_id=impl.id, tests_id=tests.id,
-                passed=result.tests_passed, total=result.tests_run,
+                passed=result.tests_passed if result else 0,
+                total=result.tests_run if result else 0,
             )
             matrix.append(cell)
 
-            if result.tests_run > 0 and result.tests_passed == result.tests_run:
+            if cell.total > 0 and cell.passed == cell.total:
                 test_pass_counts[tests.id] += 1
 
             if impl.id != tests.id:
-                rate = (result.tests_passed / result.tests_run) if result.tests_run else 0.0
+                rate = (cell.passed / cell.total) if cell.total else 0.0
                 raw_scores[impl.id].append(rate)
 
     scores = {cid: (sum(v) / len(v) if v else 0.0) for cid, v in raw_scores.items()}

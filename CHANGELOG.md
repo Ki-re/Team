@@ -7,6 +7,25 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 ## [Unreleased]
 
 ### Added
+- Sección "Arquitectura" en el README con dos diagramas Mermaid (componentes
+  del sistema, pipeline de `team_feature`) — escritos por el propio `team`
+  (`team_feature`/`team_task`), dogfooding real del proyecto sobre sí mismo.
+- `tests/test_readme.py`: comprueba que el README no tiene la IP real y que
+  la sección de arquitectura existe en el orden correcto.
+
+### Fixed
+- Anonimizadas todas las apariciones de la IP privada real del gateway
+  (`203.0.113.10`) en `README.md`, `.env.example`, `deploy/.env.example`.
+  El default de `TEAM_GATEWAY_URL` en `config.py` pasa de esa IP a
+  `http://localhost:4000`, un default genérico razonable para código
+  público en vez del valor específico del autor original.
+- **Bug real encontrado usando el propio `team` sobre este mismo repo**:
+  `engine/consensus.py::run_consensus` no capturaba `EditConflict` al
+  materializar los edits de cada candidato en la matriz N×N — un solo
+  candidato cuyo `search` no encajara limpio (ambiguo o inexistente)
+  abortaba TODO `team_feature` sin manifiesto, en vez de descartar solo esa
+  celda. Reproducido en vivo contra un README real con frases repetidas
+  (`el bloque "search" no aparece exactamente una vez (apariciones=5)`).
 - `tier-coder`: 4 modelos gratuitos más de OpenRouter (`poolside/laguna-s-2.1:free`,
   `poolside/laguna-xs-2.1:free`, `minimax/minimax-m3:free`, y el router
   propio de OpenRouter `openrouter/free`, que reparte al azar sobre ~23
