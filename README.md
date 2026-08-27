@@ -11,40 +11,22 @@ desarrollo (contiene datos de cuenta del autor) y no se publica en el repo.
 
 ## Arquitectura
 
+Diagramas SVG propios (no Mermaid: en algunos visores no cargaba bien) —
+el resto de workflows (`team_task`, `team_epic`, `team_ask`,
+`team_validate`, `docs_sync`) están en [docs/DIAGRAMS.md](docs/DIAGRAMS.md).
+
 ### Componentes
-Relación entre los componentes del sistema:
-```mermaid
-flowchart LR
-    Claude["Claude Desktop / Code (orquestador)"] -->|"MCP stdio, 5 tools"| MCP["team-mcp servidor Python"]
-    MCP -->|HTTP| GW["Gateway LiteLLM (Docker: litellm + postgres + redis)"]
-    MCP -->|subprocess| Agy["agy (Antigravity CLI), cuenta Google Pro del usuario"]
-    MCP --> SB["Sandbox: whitelist de rutas + escritura atómica"]
-    GW --> TF["tier-fast: Groq, Gemma"]
-    GW --> TC["tier-coder: OpenRouter, Mistral"]
-    GW --> TX["tier-context: Gemini Flash, Nemotron 1M+"]
-    GW --> TP["tier-premium fallback: Gemini Flash Lite"]
-    Agy -.->|"si falla o no esta disponible"| TP
-```
+Cómo se relacionan las piezas: Claude solo orquesta, `team-mcp` habla con
+el gateway y con `agy`, y toda escritura pasa por el sandbox.
+
+<img src="docs/diagrams/architecture.svg" alt="Diagrama de componentes de Team" width="900">
 
 ### Pipeline de team_feature
-Flujo de trabajo para la implementación de funcionalidades:
-```mermaid
-flowchart TD
-    A["spec + target_paths"] --> B["Fan-out: N workers en tier-coder, temperatura alta"]
-    B --> C{"Gate deterministico: verify.py, parsea?"}
-    C -->|no| D["Candidato descartado, gratis, sin gastar mas tokens"]
-    C -->|si| E["Consenso por validacion cruzada: matriz NxN impl_i vs tests_j"]
-    E --> F["Critica adversarial: tier-premium / agy"]
-    F --> G{"Tests en rojo o hallazgo bloqueante?"}
-    G -->|no| H["Escritura atomica via Sandbox"]
-    G -->|si| I["Bucle de reparacion, maximo N iteraciones"]
-    I --> J{"Estancado o agotado?"}
-    J -->|convergio| H
-    J -->|si| K["Ultimo intento: agy, repair.py"]
-    K -->|exito| H
-    K -->|fracaso| L["Manifest: tests_status=red + motivo real del fallo"]
-    H --> M["Manifest: tests_status=green + files_changed"]
-```
+Fan-out de N workers, gate determinista, consenso por validación cruzada,
+crítica adversarial y reparación acotada con escalada a `agy` como último
+recurso — la unidad de trabajo principal del proyecto.
+
+<img src="docs/diagrams/team_feature_pipeline.svg" alt="Pipeline de team_feature" width="720">
 
 ## Estado
 

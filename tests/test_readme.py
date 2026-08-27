@@ -14,7 +14,8 @@ def test_readme_architecture_section():
     assert '## Arquitectura' in content
     assert '### Componentes' in content
     assert '### Pipeline de team_feature' in content
-    assert '```mermaid' in content
+    assert 'docs/diagrams/architecture.svg' in content
+    assert 'docs/diagrams/team_feature_pipeline.svg' in content
 
 def test_readme_structure_order():
     with open('README.md', 'r', encoding='utf-8') as f:

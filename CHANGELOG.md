@@ -7,11 +7,15 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 ## [Unreleased]
 
 ### Added
-- Sección "Arquitectura" en el README con dos diagramas Mermaid (componentes
-  del sistema, pipeline de `team_feature`) — escritos por el propio `team`
-  (`team_feature`/`team_task`), dogfooding real del proyecto sobre sí mismo.
-- `tests/test_readme.py`: comprueba que el README no tiene la IP real y que
-  la sección de arquitectura existe en el orden correcto.
+- Sección "Arquitectura" en el README con dos diagramas de arquitectura
+  (componentes del sistema, pipeline de `team_feature`), y `docs/DIAGRAMS.md`
+  con los otros 5 (`team_task`, `team_epic`, `team_ask`, `team_validate`,
+  `docs_sync`). SVG propio hecho a mano, no Mermaid — los diagramas Mermaid
+  iniciales resultaron poco fiables/feos en varios visores.
+- `tests/test_readme.py`, `tests/test_diagrams.py`, `tests/test_diagrams_md.py`:
+  comprueban que el README no tiene la IP real, que los 7 SVG existen y son
+  XML válido con `viewBox`/`role`/`aria-label`, y que `docs/DIAGRAMS.md`
+  referencia las 5 tools y las 5 rutas de imagen correctas.
 
 ### Fixed
 - Anonimizadas todas las apariciones de la IP privada real del gateway

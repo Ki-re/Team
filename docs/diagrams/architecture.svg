@@ -1,0 +1,81 @@
+<svg viewBox="0 0 940 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Claude orquesta el servidor MCP team-mcp, que habla por HTTP con el gateway LiteLLM (que reparte entre 4 tiers de modelos), por subprocess con agy, y escribe en disco a traves de un sandbox con lista blanca de rutas.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="940" height="430" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <text x="24" y="32" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Componentes de Team</text>
+  <text x="24" y="50" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#64748b">Claude solo planifica y delega. Toda la implementacion la ejecuta la granja de modelos.</text>
+
+  <!-- Claude -->
+  <rect x="24" y="180" width="140" height="64" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+  <text x="94" y="206" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#4c1d95">Claude</text>
+  <text x="94" y="224" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5b21b6">Desktop / Code</text>
+  <text x="94" y="237" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5b21b6">orquestador</text>
+
+  <!-- MCP server -->
+  <rect x="228" y="180" width="150" height="64" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.6"/>
+  <text x="303" y="206" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#1e3a8a">team-mcp</text>
+  <text x="303" y="224" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#1d4ed8">servidor Python</text>
+  <text x="303" y="237" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#1d4ed8">5 tools graduadas</text>
+
+  <line x1="164" y1="212" x2="224" y2="212" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="194" y="203" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">MCP stdio</text>
+
+  <!-- Gateway -->
+  <rect x="428" y="70" width="180" height="58" rx="10" fill="#ecfeff" stroke="#06b6d4" stroke-width="1.6"/>
+  <text x="518" y="93" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#155e75">Gateway LiteLLM</text>
+  <text x="518" y="109" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#0e7490">Docker: litellm + postgres + redis</text>
+
+  <!-- agy -->
+  <rect x="428" y="183" width="180" height="58" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="1.6"/>
+  <text x="518" y="206" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#92400e">agy</text>
+  <text x="518" y="222" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#b45309">Antigravity CLI, cuenta Google Pro</text>
+
+  <!-- Sandbox -->
+  <rect x="428" y="296" width="180" height="58" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
+  <text x="518" y="319" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#14532d">Sandbox</text>
+  <text x="518" y="335" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">whitelist de rutas, escritura atomica</text>
+
+  <line x1="378" y1="197" x2="424" y2="128" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="414" y="158" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">HTTP</text>
+
+  <line x1="378" y1="212" x2="424" y2="212" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="401" y="203" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">subprocess</text>
+
+  <line x1="378" y1="227" x2="424" y2="307" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="416" y="278" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">escritura</text>
+
+  <!-- Tiers -->
+  <rect x="668" y="40" width="252" height="46" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+  <text x="794" y="59" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#1e293b">tier-fast</text>
+  <text x="794" y="74" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">Groq, Gemma — atomico, JSON repair</text>
+
+  <rect x="668" y="96" width="252" height="46" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+  <text x="794" y="115" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#1e293b">tier-coder</text>
+  <text x="794" y="130" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">OpenRouter, Mistral — generacion</text>
+
+  <rect x="668" y="152" width="252" height="46" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+  <text x="794" y="171" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#1e293b">tier-context</text>
+  <text x="794" y="186" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">Gemini Flash, Nemotron 1M+</text>
+
+  <rect x="668" y="208" width="252" height="46" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+  <text x="794" y="227" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#1e293b">tier-premium (fallback)</text>
+  <text x="794" y="242" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#475569">Gemini Flash Lite</text>
+
+  <line x1="608" y1="99" x2="664" y2="63" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="608" y1="99" x2="664" y2="119" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="608" y1="99" x2="664" y2="175" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="608" y1="99" x2="664" y2="231" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <path d="M608,227 C 636,236 640,220 664,231" fill="none" stroke="#d97706" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrowAmber)"/>
+  <text x="636" y="252" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b45309">si agy falla</text>
+
+  <text x="24" y="392" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#64748b">Cada tool de team-mcp es un pipeline completo: nunca se devuelven resultados intermedios a Claude, solo un manifiesto compacto al final.</text>
+</svg>
