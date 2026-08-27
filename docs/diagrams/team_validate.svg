@@ -1,4 +1,4 @@
-<svg viewBox="0 0 660 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_validate corre primero comprobaciones deterministas (sintaxis, tests, secretos); cualquiera en rojo fuerza NO-GO sin consultar a ningun modelo. Solo si todas pasan y hay spec_original entran trazabilidad de requisitos y revision de arquitectura, que aportan avisos, no bloqueantes.">
+<svg viewBox="0 0 660 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_validate first runs deterministic checks (syntax, tests, secrets); any of them failing forces a NO-GO with no model consulted. Only if all of them pass and spec_original was given does requirement traceability and architecture review run, contributing warnings rather than blockers.">
   <defs>
     <marker id="v1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -7,21 +7,21 @@
 
   <rect x="0" y="0" width="660" height="540" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
   <text x="24" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a">team_validate</text>
-  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">Los deterministas mandan: nunca consultan a un modelo.</text>
+  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">The deterministic checks decide: they never consult a model.</text>
 
   <rect x="160" y="70" width="340" height="42" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.4"/>
-  <text x="330" y="96" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">scope (+ spec_original opcional)</text>
+  <text x="330" y="96" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">scope (+ optional spec_original)</text>
 
   <line x1="330" y1="112" x2="330" y2="136" stroke="#64748b" stroke-width="1.6" marker-end="url(#v1)"/>
 
   <rect x="60" y="136" width="540" height="86" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
-  <text x="330" y="156" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#334155">checks deterministas, en paralelo, sin gastar tokens</text>
+  <text x="330" y="156" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#334155">deterministic checks, in parallel, no tokens spent</text>
   <rect x="80" y="168" width="94" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
-  <text x="127" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">sintaxis</text>
+  <text x="127" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">syntax</text>
   <rect x="184" y="168" width="94" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
   <text x="231" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">tests</text>
   <rect x="288" y="168" width="94" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
-  <text x="335" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">secretos</text>
+  <text x="335" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">secrets</text>
   <rect x="392" y="168" width="94" height="40" rx="7" fill="#ffffff" stroke="#94a3b8" stroke-width="1.2"/>
   <text x="439" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">git / lint</text>
   <rect x="496" y="168" width="84" height="40" rx="7" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.2"/>
@@ -31,27 +31,27 @@
   <line x1="330" y1="222" x2="330" y2="246" stroke="#64748b" stroke-width="1.6" marker-end="url(#v1)"/>
 
   <polygon points="330,246 450,290 330,334 210,290" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="330" y="285" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">¿algun</text>
-  <text x="330" y="300" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">bloqueante?</text>
+  <text x="330" y="285" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">any</text>
+  <text x="330" y="300" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">blocker?</text>
 
   <line x1="450" y1="290" x2="510" y2="290" stroke="#dc2626" stroke-width="1.6" marker-end="url(#v1)"/>
-  <text x="480" y="281" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">si</text>
+  <text x="480" y="281" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">yes</text>
 
   <rect x="440" y="302" width="180" height="56" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
   <text x="530" y="326" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#991b1b">NO-GO</text>
-  <text x="530" y="342" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b91c1c">inmediato, sin consultar ningun modelo</text>
+  <text x="530" y="342" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b91c1c">immediate, no model consulted</text>
 
   <line x1="330" y1="334" x2="330" y2="358" stroke="#16a34a" stroke-width="1.6" marker-end="url(#v1)"/>
   <text x="355" y="350" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">no</text>
 
   <rect x="130" y="358" width="400" height="60" rx="9" fill="#fffbeb" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="330" y="378" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#92400e">si hay spec_original</text>
-  <text x="330" y="394" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b45309">trazabilidad (ask.run) + arquitectura (critic.review)</text>
-  <text x="330" y="408" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b45309">aportan avisos, nunca bloquean el veredicto</text>
+  <text x="330" y="378" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#92400e">if spec_original was given</text>
+  <text x="330" y="394" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b45309">traceability (ask.run) + architecture (critic.review)</text>
+  <text x="330" y="408" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b45309">contribute warnings, never block the verdict</text>
 
   <line x1="330" y1="418" x2="330" y2="442" stroke="#64748b" stroke-width="1.6" marker-end="url(#v1)"/>
 
   <rect x="160" y="442" width="340" height="56" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
   <text x="330" y="466" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">GO</text>
-  <text x="330" y="483" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#166534">+ avisos (lint, git, requisitos no trazados...)</text>
+  <text x="330" y="483" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#166534">+ warnings (lint, git, untraced requirements...)</text>
 </svg>

@@ -1,128 +1,253 @@
-# Team — granja de modelos orquestada por Claude
+<p align="center">
+  <img src="docs/logo.svg" width="88" height="88" alt="Team logo">
+</p>
 
-Claude (Desktop/Code) actúa **solo** como orquestador: planifica y delega. Toda la
-implementación —código, análisis de logs, revisión— la ejecuta una granja de
-modelos gratuitos/de suscripción a través de un servidor MCP local que habla
-con un gateway LiteLLM 24/7.
+<h1 align="center">Team</h1>
 
-Ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones. El
-documento de diseño fase a fase se mantiene localmente durante el
-desarrollo (contiene datos de cuenta del autor) y no se publica en el repo.
+<p align="center">
+  An MCP server that lets Claude delegate real implementation work to a farm of free/cheap LLMs.
+</p>
 
-## Arquitectura
+<p align="center">
+  <a href="https://github.com/Ki-re/Team/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/Ki-re/Team/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue">
+</p>
 
-Diagramas SVG propios (no Mermaid: en algunos visores no cargaba bien) —
-el resto de workflows (`team_task`, `team_epic`, `team_ask`,
-`team_validate`, `docs_sync`) están en [docs/DIAGRAMS.md](docs/DIAGRAMS.md).
+Claude (Desktop or Code) acts **only** as the orchestrator: it plans and
+delegates. All the actual implementation — writing code, analyzing logs,
+reviewing changes — runs on a farm of free or cheap models behind a
+self-hosted LiteLLM gateway, through this local MCP server.
 
-### Componentes
-Cómo se relacionan las piezas: Claude solo orquesta, `team-mcp` habla con
-el gateway y con `agy`, y toda escritura pasa por el sandbox.
+The interesting part isn't "connect some cheap models" — small models
+produce mediocre code on their own. The value is in the *process* wrapped
+around them: N-way generation, deterministic verification, cross-validation
+consensus, adversarial critique, and bounded repair loops. Quality comes
+from the pipeline, not from any single model.
 
-<img src="docs/diagrams/architecture.svg" alt="Diagrama de componentes de Team" width="900">
+See [CHANGELOG.md](CHANGELOG.md) for the version history.
 
-### Pipeline de team_feature
-Fan-out de N workers, gate determinista, consenso por validación cruzada,
-crítica adversarial y reparación acotada con escalada a `agy` como último
-recurso — la unidad de trabajo principal del proyecto.
+## Architecture
 
-<img src="docs/diagrams/team_feature_pipeline.svg" alt="Pipeline de team_feature" width="720">
+Hand-authored SVG diagrams (not Mermaid — it didn't render consistently
+everywhere). Diagrams for the other workflows (`team_task`, `team_epic`,
+`team_ask`, `team_validate`, `docs_sync`) live in
+[docs/DIAGRAMS.md](docs/DIAGRAMS.md).
 
-## Estado
+### Components
+How the pieces fit together: Claude only orchestrates, `team-mcp` talks to
+the gateway and to an optional coding-agent CLI, and every write goes
+through a sandbox.
 
-- **Gateway LiteLLM**: desplegado en `<ip-del-servidor>:4000` (Docker: litellm + postgres + redis).
-  UI en `http://<ip-del-servidor>:4000/ui`.
-- **Servidor MCP**: registrado globalmente en Claude Code (`claude mcp add team --scope user`),
-  disponible en cualquier proyecto, no solo este repo.
-- **Las 5 tools completas y verificadas en vivo** contra el gateway real
-  (ver [CHANGELOG.md](CHANGELOG.md) para el detalle): `team_task`, los 4
-  `kind` de `team_feature` (`new`/`refactor`/`fix`/`review`), `team_ask`
-  (map-reduce + citas + búsqueda web opcional vía Tavily), `team_epic`
-  (DAG con dependencias y presupuesto real) y `team_validate` (GO/NO-GO +
-  `selftest`). Ninguna es un stub.
-- **Sincronización de knowledge-base opcional** (`update_docs`/`kb_path`
-  en `team_feature`/`team_epic`, ver [docs/KB_CONVENTION.md](docs/KB_CONVENTION.md)):
-  tras un cambio de código exitoso, actualiza los archivos de un KB en
-  markdown (frontmatter + `INDEX.md`, misma convención que la memoria de
-  Claude) que quedaron desactualizados. Solo actualiza entradas
-  existentes, no crea nuevas. `team_validate` audita el KB en sí
-  (frontmatter/links rotos/staleness) sin necesidad de `update_docs`.
-- **Suite de tests propia**: `tests/unit/` (103 tests, `pytest`) sobre toda
-  la lógica determinista/local — sandbox, verify, consenso, reparación,
-  parseo JSON, frontmatter/KB, el DAG de `team_epic`, `team_validate`,
-  config, router (nota del ledger), agy (motivo del fallback). Los caminos
-  con modelos en vivo se siguen verificando manualmente contra el gateway
-  real, no en esta suite (mockear o gastar cuota en cada corrida sería el
-  trade-off equivocado en este punto del proyecto).
-- **`selftest` programado**: tarea semanal (`team-mcp-selftest`, lunes por
-  la mañana) que corre los 4 tiers y reporta si alguno se degrada — no hace
-  falta acordarse de correrlo a mano.
-- **Skill global**: `~/.claude/skills/team/SKILL.md` — referencia rápida
-  de las 5 tools, descubrible en cualquier sesión de Claude Code, no solo
-  vía `CLAUDE.md`.
+<img src="docs/diagrams/architecture.svg" alt="Diagram of Team's components" width="900">
 
-## Estructura
+### The `team_feature` pipeline
+Fan-out across N workers, a free deterministic gate, cross-validation
+consensus, adversarial critique, and a bounded repair loop with escalation
+to the premium tier as a last resort — the project's main unit of work.
 
-```
-deploy/            docker-compose.yml + litellm.config.yaml del gateway remoto
-src/team_mcp/       servidor MCP (Python)
-  providers/        gateway.py (LiteLLM HTTP) · agy.py (Antigravity CLI) · router.py
-  engine/           verify · consensus · critic · repair · schemas · sandbox · ledger · cache
-  workflows/         team_task · team_feature · team_epic · team_ask · team_validate
-tests/golden/       casos para el pipeline selftest
-```
+<img src="docs/diagrams/team_feature_pipeline.svg" alt="team_feature pipeline" width="720">
 
-## Setup local
+## The five tools
+
+Claude only ever sees five entry points, graded by task complexity — each
+one is a complete pipeline that returns a compact manifest, never
+intermediate results or raw generated code:
+
+| Tool | Use it for | Notes |
+|---|---|---|
+| `team_task` | A small, unambiguous change to one file | No premium tier. Escalates itself to `team_feature` if the deterministic gate fails twice. |
+| `team_feature` | The main workhorse | `kind=new` (default), `refactor` (preserves behavior via generated characterization tests), `fix` (requires a `repro_command` that fails today and must exit 0 after the fix — a real test, not one the model invents), or `review` (critique only, no code generated). |
+| `team_epic` | A multi-task plan with dependencies | DAG of nodes, executed in parallel topological waves, with a real token budget and clean cutoff. |
+| `team_ask` | Questions about code or logs, read-only | Map-reduce with citation verification (`path:line`); `allow_web_search=True` for current external context. |
+| `team_validate` | Final GO/NO-GO verdict | Deterministic checks (syntax, tests, secrets, lint) block first, with no model involved; `selftest=True` audits the health of all four tiers instead. |
+
+Optional documentation sync: pass `update_docs=True` and `kb_path=...` to
+`team_feature`/`team_epic` and, after a successful change, a small
+sub-agent updates any *existing* files in a markdown knowledge base
+(frontmatter + `INDEX.md` — see [docs/KB_CONVENTION.md](docs/KB_CONVENTION.md))
+that the change made stale. It never invents new entries on its own.
+`team_validate` can also audit a knowledge base directory by itself
+(broken frontmatter, dangling links, stale entries) without `update_docs`.
+
+## Quickstart
+
+### Prerequisites
+
+- Python 3.11+
+- Docker + Docker Compose, on whatever host will run the gateway (your own
+  machine, a small VPS, a home server — anything reachable from where
+  Claude runs)
+- API keys for at least a couple of free-tier providers (e.g.
+  [Groq](https://console.groq.com), [OpenRouter](https://openrouter.ai))
+- [Claude Code](https://claude.com/claude-code) or Claude Desktop
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/Ki-re/Team.git
+cd Team
 python -m venv .venv
-.venv/Scripts/activate      # Windows
+
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -e ".[dev]"
-cp .env.example .env        # rellenar TEAM_GATEWAY_KEY, TEAM_SANDBOX_ROOTS, etc.
+cp .env.example .env
 ```
 
-## Setup del gateway (ya desplegado)
+### 2. Deploy the gateway
+
+`deploy/` has everything needed to run LiteLLM + Postgres + Redis in
+Docker. Deploy it anywhere reachable from your machine:
 
 ```bash
-# desde deploy/, con .env relleno con las API keys de cada proveedor
-scp docker-compose.yml litellm.config.yaml .env <usuario>@<ip-del-servidor>:~/team-gateway/
-ssh <usuario>@<ip-del-servidor> "cd ~/team-gateway && docker compose up -d"
+cd deploy
+cp .env.example .env   # fill in at least one provider's API key
+docker compose up -d
 ```
 
-Las API keys pueden añadirse de dos formas: editando `deploy/.env` y
-redesplegando, o directamente desde la UI web (`/ui`) sin reiniciar nada.
+First boot takes a few minutes (database migrations + registering the
+model list) — that's normal, not a hang; `docker logs -f team-litellm`
+shows progress. Add or change API keys later either by editing
+`deploy/.env` and redeploying, or live from the web UI at
+`http://<gateway-host>:4000/ui` with no restart needed
+(`store_model_in_db: true` is already set for this).
 
-**Nota de arranque**: el primer `docker compose up -d` de LiteLLM tarda
-~3-4 minutos (migraciones Prisma + registro de ~8 modelos) en el servidor
-actual (2 GB RAM). No es un cuelgue; `docker logs -f team-litellm` lo muestra.
+`deploy/litellm.config.yaml` ships as a working starting template with
+two providers per tier — free-tier model availability shifts often, so
+treat the exact model list as a starting point, verify what's actually
+live for your own keys, and run `selftest` (below) after any change.
 
-## Registrar el MCP en Claude Code (global, cualquier proyecto)
+### 3. Configure the MCP server
+
+Edit `.env` in the repo root:
 
 ```bash
-claude mcp add team --scope user -- "C:\ruta\a\este\repo\.venv\Scripts\python.exe" -m team_mcp.server
-claude mcp list   # debe mostrar "team ... Connected"
+TEAM_GATEWAY_URL=http://<gateway-host>:4000
+TEAM_GATEWAY_KEY=<the master key or a virtual key from deploy/.env>
 ```
 
-Importante: la ruta al intérprete debe ser la del `.venv` de este repo
-(no `python` a secas) — es donde está instalado el paquete `team_mcp` en
-modo editable. `.env` se carga siempre desde la raíz de este repo
-(`config.py::load_env`), sin importar desde qué proyecto se invoque el
-servidor.
+### 4. Register the MCP server with Claude Code
 
-Para Claude Desktop, el equivalente manual en su config JSON:
+```bash
+claude mcp add team --scope user -- "/absolute/path/to/Team/.venv/bin/python" -m team_mcp.server
+claude mcp list   # should show "team ... Connected"
+```
+
+On Windows, use the `.venv\Scripts\python.exe` interpreter instead. The
+path must point at *this repo's* virtual environment (not a bare
+`python`) — that's where the `team_mcp` package is installed in editable
+mode. `.env` always loads from this repo's root regardless of which
+project Claude has open when it invokes the server.
+
+For Claude Desktop, the equivalent manual entry in its JSON config:
+
 ```json
 {
   "mcpServers": {
     "team": {
-      "command": "C:\\ruta\\a\\este\\repo\\.venv\\Scripts\\python.exe",
+      "command": "/absolute/path/to/Team/.venv/bin/python",
       "args": ["-m", "team_mcp.server"]
     }
   }
 }
 ```
 
-## Verificación rápida
+### 5. Verify
 
 ```bash
-curl http://<ip-del-servidor>:4000/health/liveliness
+curl http://<gateway-host>:4000/health/liveliness
+python -m team_mcp.cli run team_validate --selftest
 ```
+
+`selftest` exercises all four tiers for real and reports which ones are
+healthy — the actual source of truth for whether your setup works, not
+just whether the gateway process is up.
+
+## Set up with an AI coding agent
+
+If you're already working inside Claude Code (or another coding agent),
+you can hand it the whole setup instead of doing it by hand. Paste this:
+
+```text
+Set up the "team" MCP server for me from https://github.com/Ki-re/Team:
+
+1. Clone the repo, create a Python 3.11+ virtualenv inside it, and run
+   `pip install -e ".[dev]"`.
+2. Copy .env.example to .env. Ask me for TEAM_GATEWAY_URL and
+   TEAM_GATEWAY_KEY once I've deployed the gateway (step 3) — don't guess
+   them.
+3. Explain that deploy/ contains a docker-compose.yml for the LiteLLM
+   gateway, and ask me where I want to run it (this machine, a remote
+   server I have SSH access to, something already running). Help me copy
+   deploy/.env.example to deploy/.env and fill in at least one provider
+   API key, then run `docker compose up -d` there.
+4. Once the gateway is reachable, register this MCP server globally:
+   `claude mcp add team --scope user -- <path-to-repo>/.venv/<bin-or-Scripts>/python -m team_mcp.server`
+   then confirm with `claude mcp list` that it shows "Connected".
+5. Copy skill/SKILL.md from this repo to ~/.claude/skills/team/SKILL.md
+   (create the directory if needed) so future sessions discover it
+   automatically, and copy skill/CLAUDE.md's contents into my global
+   ~/.claude/CLAUDE.md (append, don't overwrite anything already there).
+6. Run `python -m team_mcp.cli run team_validate --selftest` and report
+   which tiers are healthy.
+
+Ask me for any secret or credential instead of inventing one, and don't
+commit .env or deploy/.env anywhere.
+```
+
+The referenced `skill/SKILL.md` and `skill/CLAUDE.md` are the same
+condensed usage guide Claude Code's own skill system reads — see
+[Documentation](#documentation) below for how they fit together.
+
+## Project structure
+
+```
+deploy/              docker-compose.yml + litellm.config.yaml for the gateway
+skill/                portable skill + CLAUDE.md content for other agents to install
+docs/                 diagrams, knowledge-base convention, changelog detail
+src/team_mcp/         the MCP server (Python)
+  providers/           gateway.py (LiteLLM HTTP) · agy.py (coding-agent CLI) · router.py
+  engine/              verify · consensus · critic · repair · schemas · sandbox · ledger · frontmatter
+  workflows/           team_task · team_feature · team_epic · team_ask · team_validate · docs_sync
+tests/                 pytest suite (deterministic/local logic only — see below)
+playground/            scratch files used for manual live verification during development
+```
+
+## Testing
+
+```bash
+pytest tests/ -q
+```
+
+The suite covers deterministic, local logic only — sandbox path
+whitelisting, the verification gate, consensus scoring, JSON extraction,
+frontmatter parsing, the `team_epic` DAG, `team_validate`'s checks, and so
+on. Code paths that call live models (the fan-out itself, critique,
+map-reduce) are deliberately not mocked here; they're verified manually
+against a real gateway during development, since mocking `httpx` or
+spending real API quota on every test run would be the wrong trade-off at
+this project's scale.
+
+## Documentation
+
+- [docs/DIAGRAMS.md](docs/DIAGRAMS.md) — diagrams for every workflow.
+- [docs/KB_CONVENTION.md](docs/KB_CONVENTION.md) — the markdown
+  knowledge-base format `docs_sync` and `team_validate` understand.
+- [skill/SKILL.md](skill/SKILL.md) / [skill/CLAUDE.md](skill/CLAUDE.md) —
+  the portable usage guide any Claude Code session can install (see the
+  agent setup prompt above).
+- [CHANGELOG.md](CHANGELOG.md) — version history.
+
+## Contributing
+
+Issues and pull requests are welcome. There's no formal process yet —
+open an issue for anything non-trivial before sending a large PR, and
+keep the test suite green (`pytest tests/ -q`).
+
+## License
+
+[MIT](LICENSE)

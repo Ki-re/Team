@@ -73,9 +73,9 @@ def test_diagrams_md_uses_relative_diagrams_path(diagrams_text: str) -> None:
 
 
 def test_diagrams_md_has_title_and_back_link(diagrams_text: str) -> None:
-    assert "# Diagramas" in diagrams_text, (
+    assert "# Diagrams" in diagrams_text, (
         "docs/DIAGRAMS.md should start with a top-level title starting "
-        "with '# Diagramas'"
+        "with '# Diagrams'"
     )
     assert "README" in diagrams_text, (
         "docs/DIAGRAMS.md should include a back-reference to the README."

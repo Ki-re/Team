@@ -1,4 +1,4 @@
-<svg viewBox="0 0 660 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="docs_sync, activado por update_docs y kb_path, primero selecciona barato sobre el indice del knowledge-base que archivos podrian estar desactualizados, y solo para esos lee el contenido real y propone una edicion validada de forma deterministica antes de aplicarla; nunca inventa entradas nuevas ni lanza una excepcion si algo falla.">
+<svg viewBox="0 0 660 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="docs_sync, triggered by update_docs and kb_path, first cheaply selects over the knowledge-base index which files might be stale, and only for those reads the real content and proposes a validated edit before applying it; it never invents new entries and never raises an exception if something fails.">
   <defs>
     <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -7,63 +7,63 @@
 
   <rect x="0" y="0" width="660" height="620" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
   <text x="24" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a">docs_sync</text>
-  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">update_docs + kb_path en team_feature / team_epic. Dos pasadas, no una.</text>
+  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">update_docs + kb_path on team_feature / team_epic. Two passes, not one.</text>
 
   <rect x="150" y="70" width="360" height="44" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.4"/>
-  <text x="330" y="97" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">manifest del cambio ya aplicado + kb_path</text>
+  <text x="330" y="97" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">manifest of the change already applied + kb_path</text>
 
   <line x1="330" y1="114" x2="330" y2="138" stroke="#64748b" stroke-width="1.6" marker-end="url(#d1)"/>
 
   <rect x="150" y="138" width="360" height="56" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
-  <text x="330" y="160" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">1. seleccion barata</text>
-  <text x="330" y="177" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#5b21b6">INDEX.md + frontmatter (sin cuerpo) → tier-context</text>
+  <text x="330" y="160" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">1. cheap selection</text>
+  <text x="330" y="177" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#5b21b6">INDEX.md + frontmatter (no body) → tier-context</text>
 
   <line x1="330" y1="194" x2="330" y2="218" stroke="#64748b" stroke-width="1.6" marker-end="url(#d1)"/>
 
   <polygon points="330,218 450,258 330,298 210,258" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="330" y="253" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#9a3412">¿algun archivo</text>
-  <text x="330" y="267" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#9a3412">del indice afectado?</text>
+  <text x="330" y="253" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#9a3412">any index file</text>
+  <text x="330" y="267" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#9a3412">affected?</text>
 
   <line x1="450" y1="258" x2="516" y2="258" stroke="#64748b" stroke-width="1.6" marker-end="url(#d1)"/>
   <text x="483" y="249" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">no</text>
 
   <rect x="440" y="270" width="180" height="50" rx="9" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
-  <text x="530" y="291" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#334155">sin cambios</text>
-  <text x="530" y="306" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#64748b">de documentacion</text>
+  <text x="530" y="291" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#334155">no documentation</text>
+  <text x="530" y="306" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#64748b">changes needed</text>
 
   <line x1="330" y1="298" x2="330" y2="322" stroke="#16a34a" stroke-width="1.6" marker-end="url(#d1)"/>
-  <text x="355" y="314" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">si</text>
+  <text x="355" y="314" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">yes</text>
 
   <rect x="150" y="322" width="360" height="56" rx="9" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.6"/>
-  <text x="330" y="344" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">2. edicion dirigida, por archivo</text>
-  <text x="330" y="361" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#1d4ed8">contenido real completo → propone search/replace</text>
+  <text x="330" y="344" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">2. targeted edit, per file</text>
+  <text x="330" y="361" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#1d4ed8">real full content → proposes search/replace</text>
 
   <line x1="330" y1="378" x2="330" y2="402" stroke="#64748b" stroke-width="1.6" marker-end="url(#d1)"/>
 
   <polygon points="330,402 450,442 330,482 210,442" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="330" y="432" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">¿ruta en kb_path,</text>
-  <text x="330" y="446" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">frontmatter valido,</text>
-  <text x="330" y="460" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">sin links rotos?</text>
+  <text x="330" y="432" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">path in kb_path,</text>
+  <text x="330" y="446" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">frontmatter valid,</text>
+  <text x="330" y="460" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" font-weight="700" fill="#9a3412">no broken links?</text>
 
   <line x1="210" y1="442" x2="140" y2="442" stroke="#dc2626" stroke-width="1.6" marker-end="url(#d1)"/>
   <text x="175" y="433" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">no</text>
 
   <rect x="20" y="417" width="120" height="50" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
-  <text x="80" y="438" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#991b1b">reintento</text>
-  <text x="80" y="452" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9" fill="#b91c1c">con el error (max 2)</text>
+  <text x="80" y="438" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#991b1b">retry</text>
+  <text x="80" y="452" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9" fill="#b91c1c">with the error (max 2)</text>
 
   <line x1="80" y1="417" x2="80" y2="350" stroke="#dc2626" stroke-width="1.6"/>
   <line x1="80" y1="350" x2="146" y2="350" stroke="#dc2626" stroke-width="1.6" marker-end="url(#d1)"/>
 
   <line x1="330" y1="482" x2="330" y2="506" stroke="#16a34a" stroke-width="1.6" marker-end="url(#d1)"/>
-  <text x="355" y="498" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">si</text>
+  <text x="355" y="498" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">yes</text>
 
   <rect x="150" y="506" width="360" height="52" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.6"/>
-  <text x="330" y="528" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">aplicar via Sandbox</text>
-  <text x="330" y="544" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">mismo contrato FileEdit que cualquier otro edit</text>
+  <text x="330" y="528" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">apply through the Sandbox</text>
+  <text x="330" y="544" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">same FileEdit contract as any other edit</text>
 
   <line x1="330" y1="558" x2="330" y2="582" stroke="#64748b" stroke-width="1.6" marker-end="url(#d1)"/>
 
   <rect x="150" y="582" width="360" height="30" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
-  <text x="330" y="601" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">resultado: aplicados / omitidos — nunca una excepcion</text>
+  <text x="330" y="601" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#334155">result: applied / skipped — never an exception</text>
 </svg>

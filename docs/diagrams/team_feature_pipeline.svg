@@ -1,4 +1,4 @@
-<svg viewBox="0 0 780 1010" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_feature genera N candidatos en paralelo, descarta los que no parsean, elige un ganador por consenso de validacion cruzada, lo somete a critica adversarial, y si algo falla intenta repararlo hasta N veces antes de escalar a agy como ultimo recurso; solo entonces escribe en disco.">
+<svg viewBox="0 0 780 1010" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_feature generates N candidates in parallel, discards the ones that fail to parse, picks a winner by cross-validation consensus, submits it to adversarial critique, and if anything fails tries to repair it up to N times before escalating to agy as a last resort; only then does it write to disk.">
   <defs>
     <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -12,8 +12,8 @@
   </defs>
 
   <rect x="0" y="0" width="780" height="1010" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-  <text x="24" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Pipeline de team_feature</text>
-  <text x="24" y="48" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#64748b">La calidad sale del proceso: fan-out, gate gratuito, consenso cruzado, critica y reparacion.</text>
+  <text x="24" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f172a">The team_feature pipeline</text>
+  <text x="24" y="48" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#64748b">Quality comes from the process: fan-out, free gate, cross-validation, critique, repair.</text>
 
   <!-- spine: x 90-430 (w340, center 260) -->
   <rect x="90" y="70" width="340" height="40" rx="9" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.4"/>
@@ -23,83 +23,83 @@
 
   <rect x="90" y="134" width="340" height="56" rx="10" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.6"/>
   <text x="260" y="157" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#1e3a8a">Fan-out</text>
-  <text x="260" y="174" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#1d4ed8">N workers en tier-coder, temperatura alta</text>
+  <text x="260" y="174" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#1d4ed8">N workers on tier-coder, high temperature</text>
 
   <line x1="260" y1="190" x2="260" y2="204" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
 
   <!-- gate diamond center y=249, hh=45 -->
   <polygon points="260,204 430,249 260,294 90,249" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="260" y="245" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#9a3412">Gate deterministico</text>
-  <text x="260" y="260" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#c2410c">verify.py: ¿parsea?</text>
+  <text x="260" y="245" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#9a3412">Deterministic gate</text>
+  <text x="260" y="260" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#c2410c">verify.py: does it parse?</text>
 
   <line x1="430" y1="249" x2="496" y2="249" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
   <text x="463" y="240" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">no</text>
   <rect x="500" y="220" width="230" height="58" rx="9" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
-  <text x="615" y="245" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#334155">Candidato descartado</text>
-  <text x="615" y="261" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">gratis, sin gastar mas tokens</text>
+  <text x="615" y="245" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#334155">Candidate discarded</text>
+  <text x="615" y="261" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">free, no extra tokens spent</text>
 
   <line x1="260" y1="294" x2="260" y2="308" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
-  <text x="288" y="309" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">si</text>
+  <text x="288" y="309" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">yes</text>
 
   <rect x="90" y="308" width="340" height="56" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
-  <text x="260" y="331" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#4c1d95">Consenso cruzado</text>
-  <text x="260" y="348" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5b21b6">matriz N×N: impl_i contra tests_j</text>
+  <text x="260" y="331" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#4c1d95">Cross-validation consensus</text>
+  <text x="260" y="348" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#5b21b6">N×N matrix: impl_i against tests_j</text>
 
   <line x1="260" y1="364" x2="260" y2="388" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
 
   <rect x="90" y="388" width="340" height="56" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="1.6"/>
-  <text x="260" y="411" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#92400e">Critica adversarial</text>
-  <text x="260" y="428" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b45309">tier-premium (agy o su fallback)</text>
+  <text x="260" y="411" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#92400e">Adversarial critique</text>
+  <text x="260" y="428" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b45309">tier-premium (agy or its API fallback)</text>
 
   <line x1="260" y1="444" x2="260" y2="460" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
 
   <!-- decision2 diamond center y=511, hh=51 -->
   <polygon points="260,460 430,511 260,562 90,511" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="260" y="500" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">¿Tests en rojo o</text>
-  <text x="260" y="516" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">hallazgo bloqueante?</text>
+  <text x="260" y="500" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">Tests red or</text>
+  <text x="260" y="516" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">blocking finding?</text>
 
   <line x1="430" y1="511" x2="496" y2="580" stroke="#16a34a" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
   <text x="472" y="535" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">no</text>
 
   <line x1="260" y1="562" x2="260" y2="578" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
-  <text x="288" y="577" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">si</text>
+  <text x="288" y="577" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">yes</text>
 
   <rect x="90" y="578" width="340" height="56" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
-  <text x="260" y="601" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#991b1b">Bucle de reparacion</text>
-  <text x="260" y="618" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b91c1c">maximo N iteraciones, error literal de vuelta</text>
+  <text x="260" y="601" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#991b1b">Repair loop</text>
+  <text x="260" y="618" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b91c1c">up to N iterations, literal error fed back</text>
 
   <line x1="260" y1="634" x2="260" y2="654" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
 
   <!-- decision3 diamond center y=705, hh=51 -->
   <polygon points="260,654 430,705 260,756 90,705" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="260" y="701" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">¿Estancado</text>
-  <text x="260" y="717" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">o agotado?</text>
+  <text x="260" y="701" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">Stuck or</text>
+  <text x="260" y="717" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">exhausted?</text>
 
   <line x1="430" y1="705" x2="496" y2="622" stroke="#16a34a" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
-  <text x="474" y="655" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">convergio</text>
+  <text x="474" y="655" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">converged</text>
 
   <line x1="260" y1="756" x2="260" y2="774" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow2)"/>
-  <text x="288" y="771" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">si</text>
+  <text x="288" y="771" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#475569">yes</text>
 
   <rect x="90" y="774" width="340" height="56" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="1.6"/>
-  <text x="260" y="797" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#92400e">Ultimo intento: agy</text>
-  <text x="260" y="814" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b45309">repair.py escala a la cuenta Google Pro</text>
+  <text x="260" y="797" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#92400e">Last attempt: agy</text>
+  <text x="260" y="814" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#b45309">repair.py escalates to the premium tier</text>
 
   <line x1="430" y1="792" x2="496" y2="648" stroke="#16a34a" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
-  <text x="478" y="720" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">exito</text>
+  <text x="478" y="720" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">success</text>
 
   <line x1="260" y1="830" x2="260" y2="850" stroke="#dc2626" stroke-width="1.6" marker-end="url(#arrowRed)"/>
-  <text x="288" y="845" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">fracaso</text>
+  <text x="288" y="845" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">failure</text>
 
   <rect x="90" y="850" width="340" height="60" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.8"/>
   <text x="260" y="874" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#991b1b">Manifest tests_status=red</text>
-  <text x="260" y="891" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#b91c1c">con el motivo real del fallo, nunca generico</text>
+  <text x="260" y="891" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#b91c1c">with the real failure reason, never generic</text>
 
   <!-- right column: outcomes -->
   <rect x="500" y="580" width="230" height="70" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
-  <text x="615" y="606" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">Escritura atomica</text>
-  <text x="615" y="623" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">via Sandbox, respeta TEAM_DRY_RUN</text>
-  <text x="615" y="638" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">y la whitelist de rutas</text>
+  <text x="615" y="606" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">Atomic write</text>
+  <text x="615" y="623" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">through the Sandbox, respects TEAM_DRY_RUN</text>
+  <text x="615" y="638" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">and the path whitelist</text>
 
   <line x1="615" y1="650" x2="615" y2="670" stroke="#16a34a" stroke-width="1.6" marker-end="url(#arrowGreen)"/>
 
@@ -107,5 +107,5 @@
   <text x="615" y="694" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#14532d">Manifest tests_status=green</text>
   <text x="615" y="711" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">+ files_changed</text>
 
-  <text x="24" y="980" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#64748b">Todas las salidas son un Manifest compacto — nunca se devuelve codigo completo ni resultados intermedios a Claude.</text>
+  <text x="24" y="980" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#64748b">Every outcome is a compact Manifest — full code and intermediate results never go back to Claude.</text>
 </svg>

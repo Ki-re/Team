@@ -1,0 +1,16 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team logo: a central hub connected to four worker nodes">
+  <defs>
+    <marker id="none"/>
+  </defs>
+  <line x1="100" y1="100" x2="143.8" y2="56.2" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="100" y1="100" x2="143.8" y2="143.8" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="100" y1="100" x2="56.2" y2="143.8" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="100" y1="100" x2="56.2" y2="56.2" stroke="#94a3b8" stroke-width="3"/>
+
+  <circle cx="143.8" cy="56.2" r="17" fill="#3b82f6"/>
+  <circle cx="143.8" cy="143.8" r="17" fill="#06b6d4"/>
+  <circle cx="56.2" cy="143.8" r="17" fill="#d97706"/>
+  <circle cx="56.2" cy="56.2" r="17" fill="#16a34a"/>
+
+  <circle cx="100" cy="100" r="30" fill="#7c3aed"/>
+</svg>

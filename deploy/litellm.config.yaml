@@ -1,38 +1,33 @@
-# Gateway LiteLLM — "Team"
+# LiteLLM gateway config — "Team"
 #
-# 4 tiers expuestos como model_name lógicos. El servidor MCP solo conoce estos
-# 4 nombres; el roster concreto de proveedores por debajo es intercambiable
-# aquí sin tocar el MCP. El pipeline `selftest` es la fuente de verdad sobre
-# qué modelos siguen vivos/gratis — esta lista es un punto de partida
-# razonable a fecha de despliegue y debe revisarse si algún tier degrada.
+# Four tiers exposed as logical model_name entries. The MCP server only
+# ever talks to these four names; the actual provider roster underneath
+# is swappable here without touching the MCP at all. Treat this file as a
+# starting template, not a fixed catalog: free-tier model availability and
+# quotas change often across providers (Groq, OpenRouter, Gemini, etc.
+# rename or retire models with some regularity). Run `selftest`
+# (`team_validate(selftest=True)`, or `python -m team_mcp.cli run
+# team_validate --selftest`) after any change, and verify a candidate
+# model responds via the provider's own API directly before trusting its
+# public catalog listing — a model name that "should" exist can 404.
 #
-# IDs verificados en vivo el 2026-08-24 contra el /models de cada proveedor
-# (Groq, Cerebras, Gemini y OpenRouter renombran/retiran modelos con
-# frecuencia; los nombres "obvios" de hace unos meses ya no existían). Si
-# algún tier empieza a devolver 404, repetir esa consulta antes de adivinar
-# un nombre nuevo — ver README "Verificación end-to-end".
+# tier-premium here is the API FALLBACK only. `agy` (a coding-agent CLI
+# that authenticates with the operator's own subscription rather than an
+# API key) is the default path for the premium tier and is invoked
+# directly by the MCP server via subprocess (providers/agy.py), outside
+# LiteLLM entirely — that's why the agy -> API fallback can't live in the
+# `fallbacks:` block below (that section only chains model groups INSIDE
+# the proxy) and is implemented by hand in Python instead. `agy` is also
+# used as a last-resort repair step when the tier-coder repair loop gets
+# stuck (engine/repair.py) — a paid coding-agent subscription typically
+# has far more real headroom than a shared free-tier pool.
 #
-# Roster de Gemini reescrito el 2026-08-26 a partir del panel REAL de
-# cuotas del usuario (ai.dev/rate-limit), no solo del /models público:
-# los "Flash Lite" (3.1 y 3.5) tienen RPD=500/RPM=15, los "Flash" a secas
-# (3, 3.5, 3.6, 3.7) solo RPD=20/RPM=5 — 25x menos. Por eso los Lite son
-# la columna vertebral y los demás solo diversidad/desbordamiento. Gemini
-# Pro tiene RPD=0/RPM=0 en esta cuenta (confirmado dos veces, persistente,
-# no transitorio) — no vale la pena tenerlo en el pool, cada intento es un
-# fallo seguro; ver providers/agy.py para la vía real a capacidad "Pro"
-# (la suscripción Google Pro del usuario, fuera de esta key de API).
-#
-# tier-premium aquí = SOLO el fallback API. `agy` (Antigravity CLI) es la
-# vía por defecto del tier premium y se invoca directamente desde el MCP
-# (providers/agy.py) por subprocess, fuera de LiteLLM — por eso el
-# fallback agy->API no puede vivir en `fallbacks:` de más abajo (esa
-# sección solo encadena model groups DENTRO del proxy) y se implementa a
-# mano en Python. Desde 2026-08-26, agy también se usa para reparar código
-# cuando el bucle de tier-coder se estanca (engine/repair.py) — tiene
-# mucha más cuota real (la suscripción del usuario) que el pool gratuito.
+# If you don't have (or don't want) a coding-agent CLI like this, just
+# leave TEAM_AGY_PATH empty in your .env — the MCP falls back to the
+# tier-premium API entries below automatically.
 
 model_list:
-  # ---------------- tier-fast: atómico, JSON repair, clasificación ----------------
+  # ---------------- tier-fast: atomic tasks, JSON repair, classification ----------------
   - model_name: tier-fast
     litellm_params:
       model: groq/openai/gpt-oss-20b
@@ -41,36 +36,15 @@ model_list:
     litellm_params:
       model: groq/qwen/qwen3.6-27b
       api_key: os.environ/GROQ_API_KEY
-  - model_name: tier-fast
-    litellm_params:
-      # RPM=30 / RPD=14400 en el panel real del usuario — el mayor margen
-      # diario de todo el roster, ideal para tareas atómicas repetidas.
-      # TPM=16K es bajo (no sirve para prompts largos, pero tier-fast no
-      # los tiene). Cuenta de Gemini, no de Cerebras (ese sí sigue muerto).
-      model: gemini/gemma-4-31b-it
-      api_key: os.environ/GEMINI_API_KEY
-  # cerebras/gpt-oss-120b quitado el 2026-08-25: confirmado en vivo que la
-  # cuenta entera devuelve 402 "Payment required" (probado también con
-  # gemma-4-31b vía Cerebras, mismo error — no es el modelo, es que el free
-  # tier de la cuenta se acabó). selftest lo detectó; se necesitaría una
-  # key nueva o facturación para reactivarlo, fuera de lo que se puede
-  # hacer aquí.
 
-  # ---------------- tier-coder: generación/refactor de código ----------------
-  # Ampliado el 2026-08-27 tras diagnosticar en vivo (ledger real, ~2h de
-  # fallos entre 06:18-08:26 UTC) que tier-coder se colgaba el timeout
-  # completo (120s, cero output) — no un bug del proxy: `/health/liveliness`
-  # seguía sano, la propia llamada real a un backend concreto era la que se
-  # quedaba colgada. Con solo 4 entradas, un único modelo caído se lleva de
-  # golpe 1/4 (o 1/3, tras el fan-out inicial) de la capacidad de cada
-  # llamada. Mitigación: más familias de modelo = menos probabilidad de que
-  # el round-robin vuelva a caer justo en el que está degradado ese día.
-  # Los 4 originales quedan (diversidad de familia sigue siendo lo que hace
-  # útil la matriz de consenso cruzado); se añaden 4 más, verificados en
-  # vivo contra la API de OpenRouter directamente (no solo el catálogo)
-  # antes de añadirlos aquí — 2 candidatos más (`minimax/minimax-m2.7:free`,
-  # `google/gemma-4-26b-a4b-it:free`) dieron 429 "rate-limited upstream" en
-  # el momento de probar y se descartaron por eso, no por nombre inválido.
+  # ---------------- tier-coder: code generation / refactoring ----------------
+  # Deliberately spans multiple distinct model families (not the same
+  # family repeated under different keys) — that real diversity is what
+  # makes the cross-validation consensus matrix useful. A pool this small
+  # also means a single degraded model takes out a meaningful fraction of
+  # every fan-out call; if you see intermittent timeouts, the fix is
+  # usually adding more independent model families here rather than
+  # retrying the same small pool.
   - model_name: tier-coder
     litellm_params:
       model: openrouter/cohere/north-mini-code:free
@@ -81,116 +55,63 @@ model_list:
       api_key: os.environ/OPENROUTER_KEY_2
   - model_name: tier-coder
     litellm_params:
-      model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
-      api_key: os.environ/OPENROUTER_KEY_1
-  - model_name: tier-coder
-    litellm_params:
       model: mistral/codestral-latest
       api_key: os.environ/MISTRAL_KEY
   - model_name: tier-coder
     litellm_params:
-      # modelo de agente de código dedicado de Poolside, confirmado en vivo.
-      model: openrouter/poolside/laguna-s-2.1:free
-      api_key: os.environ/OPENROUTER_KEY_1
-  - model_name: tier-coder
-    litellm_params:
-      # variante más pequeña/rápida del mismo modelo de Poolside.
-      model: openrouter/poolside/laguna-xs-2.1:free
-      api_key: os.environ/OPENROUTER_KEY_2
-  - model_name: tier-coder
-    litellm_params:
-      model: openrouter/minimax/minimax-m3:free
-      api_key: os.environ/OPENROUTER_KEY_1
-  - model_name: tier-coder
-    litellm_params:
-      # "Free Models Router" propio de OpenRouter — NO un modelo fijo: en
-      # cada llamada selecciona al azar entre ~23 modelos gratis de su
-      # catálogo, filtrando por las features que pida la request (tool
-      # calling, structured outputs, etc.). No promete evitar backends
-      # degradados (no hay health-check documentado, confirmado vía su
-      # doc), pero al repartir sobre un pool mucho mayor que el nuestro
-      # baja la probabilidad de que CUALQUIER llamada individual caiga en
-      # el mismo modelo hundido dos veces seguidas. Verificado en vivo: una
-      # llamada de prueba resolvió a `dots-studio/dots-3-note-preview:free`,
-      # confirmando que sí enruta de verdad y no es un alias fijo.
+      # OpenRouter's own "Free Models Router" — not a fixed model: each
+      # call is routed at random across its free-tier catalog, filtered
+      # for the features the request needs (tool calling, structured
+      # outputs, etc). It doesn't promise to route around unhealthy
+      # backends specifically, but spreading load over a much larger pool
+      # than a hand-picked list lowers the odds that any single call lands
+      # on whatever happens to be degraded that day.
       model: openrouter/openrouter/free
       api_key: os.environ/OPENROUTER_KEY_2
 
-  # ---------------- tier-context: ventanas 1M+, logs/docs enormes ----------------
-  # Los dos "Flash Lite" primero (RPD=500 cada uno en el panel real del
-  # usuario): son la columna vertebral real. Los "Flash" a secas después,
-  # como diversidad/desbordamiento — RPD=20 cada uno, pero cada modelo es
-  # un cubo de cuota INDEPENDIENTE, así que sí suman capacidad agregada.
+  # ---------------- tier-context: 1M+ context windows, large logs/repos ----------------
   - model_name: tier-context
     litellm_params:
       model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
   - model_name: tier-context
     litellm_params:
-      model: gemini/gemini-3.5-flash-lite
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-context
-    litellm_params:
-      model: gemini/gemini-3.6-flash
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-context
-    litellm_params:
-      model: gemini/gemini-3.7-flash
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-context
-    litellm_params:
-      # 1M de contexto real, confirmado en el listado de OpenRouter — y un
-      # proveedor totalmente distinto, no comparte cuota con nada de arriba.
+      # a genuinely different provider, so it doesn't share a quota bucket
+      # with anything above.
       model: openrouter/nvidia/nemotron-3.5-lightning:free
-      # sin OPENROUTER_KEY_CONTEXT propia: una key de OpenRouter no está
-      # atada a un tier, así que reutilizamos la de tier-coder.
+      # no separate context-tier key needed: an OpenRouter key isn't tied
+      # to a specific tier, so this reuses the tier-coder one.
       api_key: os.environ/OPENROUTER_KEY_1
 
-  # ---------------- tier-premium: SOLO fallback API (agy es la vía primaria) ----------------
-  # agy (Antigravity CLI) NO usa API key — corre por subprocess con el login
-  # de la cuenta Google Pro del usuario (providers/agy.py). Esta entrada solo
-  # se usa cuando agy falla/no responde, vía el gateway. Reutiliza
-  # GEMINI_API_KEY (misma cuenta de AI Studio que tier-context) en vez de
-  # pedir una key separada.
-  #
-  # Gemini Pro (gemini-pro-latest / gemini-3.1-pro-preview) se probó y se
-  # quitó del pool el 2026-08-26: cuota real = 0/0 en el panel del usuario,
-  # confirmado persistente (no transitorio, reintentado tras 15s con el
-  # mismo error). No hay forma de arreglarlo desde este config — no lo
-  # vuelvas a añadir sin comprobar antes que el usuario activó facturación.
+  # ---------------- tier-premium: API fallback only (agy is the primary path) ----------------
+  # A "Pro"-tier model (e.g. Gemini Pro) will often show 0 free-tier quota
+  # on a fresh API key — that's usually an account-level entitlement gap
+  # (billing not enabled on that project), not a broken model name. Don't
+  # add one here until you've confirmed real quota for it.
   - model_name: tier-premium
     litellm_params:
       model: gemini/gemini-3.1-flash-lite
       api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-premium
-    litellm_params:
-      model: gemini/gemini-3.5-flash-lite
-      api_key: os.environ/GEMINI_API_KEY
-  - model_name: tier-premium
-    litellm_params:
-      model: gemini/gemini-3.6-flash
-      api_key: os.environ/GEMINI_API_KEY
 
-# ---------------- MCP Gateway: tool-use para workers (Fase 7 del plan) ----------------
-# Solo usado por team_ask (allow_web_search=True) sobre tier-context. Nada
-# que escribe código (team_task/team_feature/team_epic) toca esto — dar
-# tool-use en vivo a un worker que genera código sería una vía de escape a
-# la jaula de sandbox.py.
+# ---------------- MCP Gateway: tool-use for workers ----------------
+# Used only by team_ask (when Claude passes allow_web_search=True) on
+# tier-context. Nothing that writes code (team_task/team_feature/
+# team_epic) touches this — giving live tool-use to a worker that
+# generates code would be an escape hatch out of sandbox.py's jail.
 #
-# Servidor MCP remoto de Tavily (hospedado por ellos, no autohospedado —
-# Brave exige tarjeta de crédito incluso para el free tier; Tavily da
-# 1000 créditos/mes que se renuevan, sin tarjeta). La key va DENTRO de la
-# URL completa como query param (así es como Tavily espera su MCP
-# hospedado); por eso TAVILY_MCP_URL guarda la URL entera, no solo la key
-# — la sustitución os.environ/VAR de LiteLLM reemplaza el valor completo
-# del campo, no fragmentos dentro de una cadena mayor.
+# Point this at any hosted MCP server that provides web search (Tavily's
+# hosted server is one option, no self-hosting required). The key
+# typically goes inside the full URL as a query param — check your
+# provider's docs for the exact URL shape, and store the FULL url in
+# TAVILY_MCP_URL, not just the key: LiteLLM's os.environ/VAR substitution
+# replaces the entire field value, not a fragment inside a larger string.
 mcp_servers:
   tavily:
     url: os.environ/TAVILY_MCP_URL
 
 router_settings:
   routing_strategy: simple-shuffle
-  # una key/modelo que falla repetidamente sale del pool temporalmente
+  # a key/model that keeps failing gets temporarily pulled from the pool
   allowed_fails: 2
   cooldown_time: 60
   num_retries: 2
@@ -201,9 +122,9 @@ router_settings:
 litellm_settings:
   drop_params: true
   set_verbose: false
-  # cascada de fallback: si tier-coder se agota, degrada a tier-fast antes de
-  # rendirse; tier-context cae a tier-premium (Flash Lite de Gemini, no Pro
-  # — ver nota arriba) para no perder la tarea aunque salga más lento.
+  # fallback cascade: if tier-coder is exhausted, degrade to tier-fast
+  # before giving up; tier-context falls back to tier-premium so a task
+  # doesn't get lost even if it comes back slower.
   fallbacks:
     - tier-coder: ["tier-fast"]
     - tier-context: ["tier-premium"]
@@ -214,6 +135,6 @@ general_settings:
   database_url: os.environ/DATABASE_URL
   ui_username: os.environ/UI_USERNAME
   ui_password: os.environ/UI_PASSWORD
-  # permite añadir/editar modelos y virtual keys desde /ui sin reiniciar,
-  # persistido en Postgres, tal como se pidió.
+  # lets you add/edit models and virtual keys from the /ui without
+  # restarting anything, persisted in Postgres.
   store_model_in_db: true

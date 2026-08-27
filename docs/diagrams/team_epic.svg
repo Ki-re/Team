@@ -1,4 +1,4 @@
-<svg viewBox="0 0 680 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_epic ejecuta un DAG de nodos por oleadas topologicas, corriendo en paralelo los nodos con dependencias ya resueltas, comprobando el presupuesto antes de cada oleada, y marcando como skipped tanto los nodos con una dependencia fallida como los que quedan sin presupuesto.">
+<svg viewBox="0 0 680 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="team_epic runs a DAG of nodes in topological waves, running nodes with resolved dependencies in parallel, checking the budget before each wave, and marking as skipped both nodes with a failed dependency and the ones left without budget.">
   <defs>
     <marker id="e1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -10,11 +10,11 @@
 
   <rect x="0" y="0" width="680" height="620" rx="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
   <text x="24" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f172a">team_epic</text>
-  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">DAG de nodos, presupuesto global, corte limpio si se agota.</text>
+  <text x="24" y="47" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#64748b">DAG of nodes, global budget, clean cutoff when it runs out.</text>
 
   <!-- mini DAG example -->
   <rect x="24" y="66" width="632" height="120" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2"/>
-  <text x="40" y="84" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#94a3b8">ejemplo de plan</text>
+  <text x="40" y="84" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#94a3b8">example plan</text>
 
   <rect x="56" y="96" width="90" height="42" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5"/>
   <text x="101" y="122" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">A</text>
@@ -29,46 +29,46 @@
   <line x1="146" y1="117" x2="276" y2="132" stroke="#64748b" stroke-width="1.4" marker-end="url(#e1)"/>
   <line x1="146" y1="167" x2="276" y2="150" stroke="#64748b" stroke-width="1.4" marker-end="url(#e1)"/>
 
-  <text x="500" y="112" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">A y B corren en</text>
-  <text x="500" y="126" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">la oleada 1, en</text>
-  <text x="500" y="140" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">paralelo. C espera</text>
-  <text x="500" y="154" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">a la oleada 2.</text>
+  <text x="500" y="112" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">A and B run in</text>
+  <text x="500" y="126" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">wave 1, in</text>
+  <text x="500" y="140" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">parallel. C waits</text>
+  <text x="500" y="154" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#64748b">for wave 2.</text>
 
   <!-- spine -->
   <line x1="340" y1="186" x2="340" y2="210" stroke="#64748b" stroke-width="1.6" marker-end="url(#e1)"/>
 
   <rect x="170" y="210" width="340" height="46" rx="9" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
-  <text x="340" y="238" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">orden topologico por oleadas (Kahn)</text>
+  <text x="340" y="238" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#334155">topological ordering by waves (Kahn)</text>
 
   <line x1="340" y1="256" x2="340" y2="280" stroke="#64748b" stroke-width="1.6" marker-end="url(#e1)"/>
 
   <rect x="170" y="280" width="340" height="56" rx="9" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.6"/>
-  <text x="340" y="303" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">oleada: nodos listos en paralelo</text>
-  <text x="340" y="320" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#1d4ed8">cada nodo corre team_feature.run()</text>
+  <text x="340" y="303" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">wave: ready nodes run in parallel</text>
+  <text x="340" y="320" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#1d4ed8">each node runs team_feature.run()</text>
 
   <line x1="340" y1="336" x2="340" y2="360" stroke="#64748b" stroke-width="1.6" marker-end="url(#e1)"/>
 
   <polygon points="340,360 460,404 340,448 220,404" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
-  <text x="340" y="399" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">¿presupuesto</text>
-  <text x="340" y="414" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">agotado?</text>
+  <text x="340" y="399" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">budget</text>
+  <text x="340" y="414" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" fill="#9a3412">exhausted?</text>
 
   <line x1="460" y1="404" x2="530" y2="404" stroke="#dc2626" stroke-width="1.6" marker-end="url(#e1)"/>
-  <text x="495" y="395" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">si</text>
+  <text x="495" y="395" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#991b1b">yes</text>
 
   <rect x="450" y="416" width="200" height="56" rx="9" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
-  <text x="550" y="440" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#991b1b">resto: skipped</text>
-  <text x="550" y="456" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b91c1c">corte limpio, sin excepcion</text>
+  <text x="550" y="440" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#991b1b">rest: skipped</text>
+  <text x="550" y="456" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#b91c1c">clean cutoff, no exception</text>
 
   <line x1="340" y1="448" x2="340" y2="472" stroke="#16a34a" stroke-width="1.6" marker-end="url(#e1)"/>
   <text x="365" y="464" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">no</text>
 
   <rect x="170" y="472" width="340" height="50" rx="9" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="4 3"/>
-  <text x="340" y="493" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#475569">siguiente oleada</text>
-  <text x="340" y="507" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#64748b">hasta vaciar los nodos restantes</text>
+  <text x="340" y="493" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" fill="#475569">next wave</text>
+  <text x="340" y="507" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#64748b">until the remaining nodes run out</text>
 
   <line x1="340" y1="522" x2="340" y2="546" stroke="#64748b" stroke-width="1.6" marker-end="url(#e1)"/>
 
   <rect x="170" y="546" width="340" height="56" rx="9" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.8"/>
-  <text x="340" y="570" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#14532d">Manifest final</text>
-  <text x="340" y="587" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">completados / fallidos / omitidos + gasto vs presupuesto</text>
+  <text x="340" y="570" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#14532d">Final Manifest</text>
+  <text x="340" y="587" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" fill="#166534">completed / failed / skipped + spend vs budget</text>
 </svg>
