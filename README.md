@@ -5,7 +5,9 @@ implementación —código, análisis de logs, revisión— la ejecuta una granj
 modelos gratuitos/de suscripción a través de un servidor MCP local que habla
 con un gateway LiteLLM 24/7.
 
-Ver el plan completo de diseño en `.claude/plans` (o pedir un resumen).
+Ver [CHANGELOG.md](CHANGELOG.md) para el historial de versiones. El
+documento de diseño fase a fase se mantiene localmente durante el
+desarrollo (contiene datos de cuenta del autor) y no se publica en el repo.
 
 ## Estado
 
@@ -71,7 +73,7 @@ actual (2 GB RAM). No es un cuelgue; `docker logs -f team-litellm` lo muestra.
 ## Registrar el MCP en Claude Code (global, cualquier proyecto)
 
 ```bash
-claude mcp add team --scope user -- "C:\Users\Kire\Documents\GitHub\Team\.venv\Scripts\python.exe" -m team_mcp.server
+claude mcp add team --scope user -- "C:\ruta\a\este\repo\.venv\Scripts\python.exe" -m team_mcp.server
 claude mcp list   # debe mostrar "team ... Connected"
 ```
 
@@ -86,7 +88,7 @@ Para Claude Desktop, el equivalente manual en su config JSON:
 {
   "mcpServers": {
     "team": {
-      "command": "C:\\Users\\Kire\\Documents\\GitHub\\Team\\.venv\\Scripts\\python.exe",
+      "command": "C:\\ruta\\a\\este\\repo\\.venv\\Scripts\\python.exe",
       "args": ["-m", "team_mcp.server"]
     }
   }
