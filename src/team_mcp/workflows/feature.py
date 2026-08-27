@@ -194,7 +194,7 @@ async def _verify_in_scratch(
 
 async def _generate_candidate(
     router: Router, worker_id: str, spec: str, target_paths: list[str], base_files: dict[str, str],
-) -> ConsensusCandidate | None:
+) -> tuple[ConsensusCandidate | None, str | None]:
     # todo lo interno (base_files, edits, scratch dirs, la matriz de
     # consenso) vive en "espacio de basename" plano, igual que las claves de
     # base_files. La traducción a las rutas reales de destino pasa UNA sola
@@ -208,9 +208,12 @@ async def _generate_candidate(
         data = extract_json(raw)
         edits = [FileEdit(**e) for e in data["edits"]]
         test_edits = [FileEdit(**e) for e in data.get("test_edits", [])]
-    except Exception:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
-        return None
-    return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=test_edits)
+    except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
+        # antes se descartaba el motivo (timeout, 429, JSON roto, campo
+        # faltante quedaban todos indistinguibles como "None") — obligaba a
+        # ir al ledger a mano para saber cuál fue de verdad.
+        return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
+    return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=test_edits), None
 
 
 async def _run_new(
@@ -222,12 +225,13 @@ async def _run_new(
         _generate_candidate(router, f"w{i}", spec, target_paths, base_files)
         for i in range(1, _N_WORKERS + 1)
     ])
-    candidates = [c for c in results if c is not None]
+    candidates = [c for c, _ in results if c is not None]
 
     if not candidates:
+        errors = "; ".join(e for _, e in results if e)
         return Manifest(
             tool=_WORKFLOW, kind=FeatureKind.new, tests_status="red",
-            summary="ningún worker de tier-coder produjo un candidato válido (JSON roto o error de API)",
+            summary=f"ningún worker de tier-coder produjo un candidato válido: {errors}",
             dry_run=config.dry_run,
         )
 
@@ -321,12 +325,14 @@ async def _run_refactor(
     sandbox = Sandbox(config)
 
     char_edits: list[FileEdit] = []
+    char_last_error = ""
     for _ in range(_MAX_CHAR_TEST_ATTEMPTS):
         try:
             raw = await router.coder(_WORKFLOW, _CHARACTERIZE_PROMPT.format(content=content), temperature=0.3)
             data = extract_json(raw)
             candidate = [FileEdit(**e) for e in data["test_edits"]]
-        except Exception:  # noqa: BLE001, S112 — reintentamos, no propagamos
+        except Exception as exc:  # noqa: BLE001, S112 — reintentamos, no propagamos
+            char_last_error = f"{type(exc).__name__}: {exc}"[:300]
             continue
         result = await _verify_in_scratch(
             sandbox, base_files, candidate, test_command=_TEST_COMMAND,
@@ -335,32 +341,35 @@ async def _run_refactor(
         if result.tests_run > 0 and result.tests_passed == result.tests_run:
             char_edits = candidate
             break
+        char_last_error = result.error_output or "tests de caracterización generados no pasaron en verde"
 
     if not char_edits:
         return Manifest(
             tool=_WORKFLOW, kind=FeatureKind.refactor, tests_status="not_run",
             summary=(
                 f"no se pudieron generar tests de caracterización que pasen contra el "
-                f"código actual tras {_MAX_CHAR_TEST_ATTEMPTS} intentos — abortado sin tocar nada"
+                f"código actual tras {_MAX_CHAR_TEST_ATTEMPTS} intentos — abortado sin tocar nada. "
+                f"Último error: {char_last_error[:300]}"
             ),
             dry_run=config.dry_run,
         )
 
-    async def _one(worker_id: str) -> ConsensusCandidate | None:
+    async def _one(worker_id: str) -> tuple[ConsensusCandidate | None, str | None]:
         try:
             raw = await router.coder(_WORKFLOW, _REFACTOR_PROMPT.format(goal=spec, content=content), temperature=0.7)
             data = extract_json(raw)
             edits = [FileEdit(**e) for e in data["edits"]]
-        except Exception:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
-            return None
-        return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[])
+        except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
+            return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
+        return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[]), None
 
     results = await asyncio.gather(*[_one(f"w{i}") for i in range(1, _N_WORKERS + 1)])
-    candidates = [c for c in results if c is not None]
+    candidates = [c for c, _ in results if c is not None]
     if not candidates:
+        errors = "; ".join(e for _, e in results if e)
         return Manifest(
             tool=_WORKFLOW, kind=FeatureKind.refactor, tests_status="red",
-            summary="ningún worker produjo un refactor válido (JSON roto o error de API)",
+            summary=f"ningún worker produjo un refactor válido: {errors}",
             dry_run=config.dry_run,
         )
 
@@ -476,7 +485,7 @@ async def _run_fix(
     except Exception:  # noqa: BLE001, S110 — puramente informativo, no bloquea el fix
         pass
 
-    async def _one(worker_id: str) -> ConsensusCandidate | None:
+    async def _one(worker_id: str) -> tuple[ConsensusCandidate | None, str | None]:
         prompt = _FIX_PROMPT.format(
             repro_command=repro_command, bug=spec, localization=localization, content=content,
         )
@@ -484,16 +493,17 @@ async def _run_fix(
             raw = await router.coder(_WORKFLOW, prompt, temperature=0.6)
             data = extract_json(raw)
             edits = [FileEdit(**e) for e in data["edits"]]
-        except Exception:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
-            return None
-        return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[])
+        except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
+            return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
+        return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[]), None
 
     results = await asyncio.gather(*[_one(f"w{i}") for i in range(1, _N_WORKERS + 1)])
-    candidates = [c for c in results if c is not None]
+    candidates = [c for c, _ in results if c is not None]
     if not candidates:
+        errors = "; ".join(e for _, e in results if e)
         return Manifest(
             tool=_WORKFLOW, kind=FeatureKind.fix, tests_status="red",
-            summary="ningún worker produjo un parche válido (JSON roto o error de API)",
+            summary=f"ningún worker produjo un parche válido: {errors}",
             dry_run=config.dry_run,
         )
 

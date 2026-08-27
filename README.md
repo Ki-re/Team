@@ -19,9 +19,10 @@ Ver el plan completo de diseño en `.claude/plans` (o pedir un resumen).
   citas + búsqueda web opcional vía Tavily), `team_epic` (DAG con
   dependencias y presupuesto real) y `team_validate` (GO/NO-GO + `selftest`).
   Ninguna es un stub.
-- **Suite de tests propia**: `tests/unit/` (64 tests, `pytest`) sobre toda
+- **Suite de tests propia**: `tests/unit/` (77 tests, `pytest`) sobre toda
   la lógica determinista/local — sandbox, verify, consenso, reparación,
-  parseo JSON, el DAG de `team_epic`, `team_validate`, config. Los caminos
+  parseo JSON, el DAG de `team_epic`, `team_validate`, config, router (nota
+  del ledger), agy (motivo del fallback). Los caminos
   con modelos en vivo se siguen verificando manualmente contra el gateway
   real, no en esta suite (mockear o gastar cuota en cada corrida sería el
   trade-off equivocado en este punto del proyecto).

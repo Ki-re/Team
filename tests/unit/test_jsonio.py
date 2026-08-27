@@ -36,3 +36,22 @@ def test_extract_json_raises_when_no_json_present():
 def test_extract_json_raises_on_malformed_json():
     with pytest.raises(Exception):  # noqa: B017 — json.JSONDecodeError, no queremos acoplar el tipo exacto
         extract_json("{a: 1, b:}")
+
+
+def test_extract_json_strips_think_block_containing_braces():
+    # el caso real que rompía el regex greedy: el modelo razona en voz alta
+    # sobre la forma del JSON (con llaves de ejemplo) ANTES del JSON real.
+    raw = (
+        '<think>voy a devolver algo como {"ejemplo": true} y luego el real</think>'
+        '{"edits": [{"path": "a.py", "replace": "x = 1\\n"}]}'
+    )
+    assert extract_json(raw) == {"edits": [{"path": "a.py", "replace": "x = 1\n"}]}
+
+
+def test_extract_json_strips_thinking_block_case_insensitive():
+    raw = '<THINKING>{no es esto}</THINKING>\n{"a": 1}'
+    assert extract_json(raw) == {"a": 1}
+
+
+def test_extract_json_works_without_think_block():
+    assert extract_json('{"a": 1}') == {"a": 1}

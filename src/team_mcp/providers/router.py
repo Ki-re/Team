@@ -34,11 +34,15 @@ class Router:
             resp = await self.gateway.chat(
                 tier, messages, temperature=temperature, max_tokens=max_tokens
             )
-        except Exception:
+        except Exception as exc:
+            # antes `note` quedaba siempre vacío: un timeout, un 429 y un
+            # JSON roto quedaban indistinguibles en el ledger, forzando a
+            # diagnosticar leyendo código en vez de la propia telemetría.
             self._ledger.record(SpendEvent(
                 workflow=workflow, tier=tier, model=tier,
                 tokens_in=0, tokens_out=0,
                 latency_ms=(time.monotonic() - t0) * 1000, ok=False,
+                note=f"{type(exc).__name__}: {exc}"[:500],
             ))
             raise
 
@@ -90,11 +94,12 @@ class Router:
             result = await self.gateway.respond_with_tools(
                 self._config.tier_context, prompt, tools=tools,
             )
-        except Exception:
+        except Exception as exc:
             self._ledger.record(SpendEvent(
                 workflow=workflow, tier=self._config.tier_context, model="responses+tools",
                 tokens_in=0, tokens_out=0,
                 latency_ms=(time.monotonic() - t0) * 1000, ok=False,
+                note=f"{type(exc).__name__}: {exc}"[:500],
             ))
             raise
 
@@ -113,5 +118,8 @@ class Router:
             model=f"agy:{self.premium.last_used}",
             tokens_in=0, tokens_out=0,
             latency_ms=(time.monotonic() - t0) * 1000, ok=True,
+            # si agy falló y degradó a fallback, el motivo queda aquí en vez
+            # de perderse — antes `last_used="fallback"` no decía por qué.
+            note=self.premium.last_error or "",
         ))
         return result

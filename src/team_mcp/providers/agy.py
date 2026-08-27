@@ -55,6 +55,7 @@ class PremiumProvider:
         self._gateway = gateway
         self._agy_path = resolve_agy_path(config)
         self.last_used: str | None = None  # "agy" | "fallback" — para el ledger
+        self.last_error: str | None = None  # motivo del fallback, si lo hubo — para el ledger
 
     @property
     def agy_available(self) -> bool:
@@ -81,11 +82,15 @@ class PremiumProvider:
             return {"agy": False, "path": self._agy_path, "reason": str(exc)}
 
     async def complete(self, prompt: str, *, timeout: float = 180.0) -> str:
+        self.last_error = None
         if self._agy_path:
             try:
                 return await self._run_agy(prompt, timeout=timeout)
-            except (TimeoutError, OSError, RuntimeError):
-                pass  # degrada a fallback silenciosamente; queda anotado en last_used
+            except (TimeoutError, OSError, RuntimeError) as exc:
+                # degrada a fallback; el motivo ya no se pierde — antes solo
+                # quedaba anotado en last_used ("fallback"), sin decir POR
+                # QUÉ, obligando a leer código para diagnosticar en vivo.
+                self.last_error = f"{type(exc).__name__}: {exc}"[:300]
 
         self.last_used = "fallback"
         resp = await self._gateway.chat(

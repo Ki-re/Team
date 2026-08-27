@@ -21,7 +21,19 @@ class JsonExtractionError(ValueError):
     pass
 
 
+# los modelos "razonadores" (algunos de tier-coder/tier-context vía
+# OpenRouter) a veces filtran su cadena de pensamiento envuelta en estas
+# etiquetas ANTES del JSON pedido. Si ese bloque contiene aunque sea una
+# sola llave suelta (frecuente: el modelo "piensa en voz alta" sobre la
+# forma del JSON que va a producir), el regex greedy de abajo la toma como
+# inicio del match y cruza hasta el `}` real final, produciendo un slice
+# inválido — visto fallar en producción (reportado como "backend leaking
+# <think> tags"). Se recortan enteros antes de buscar JSON.
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>|<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE)
+
+
 def extract_json(raw: str) -> dict | list:
+    raw = _THINK_BLOCK_RE.sub("", raw)
     obj_match = re.search(r"\{.*\}", raw, re.DOTALL)
     arr_match = re.search(r"\[.*\]", raw, re.DOTALL)
     candidates = [m.group(0) for m in (obj_match, arr_match) if m]
