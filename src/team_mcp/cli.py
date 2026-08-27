@@ -76,6 +76,8 @@ def main() -> None:
     p_run.add_argument("--budget", type=int, default=None)
     p_run.add_argument("--selftest", action="store_true")
     p_run.add_argument("--dry-run", action="store_true")
+    p_run.add_argument("--update-docs", action="store_true")
+    p_run.add_argument("--kb-path")
 
     args = parser.parse_args()
 
@@ -117,6 +119,8 @@ def main() -> None:
                     "target_paths": args.target_paths or [],
                     "kind": args.kind,
                     "repro_command": args.repro_command,
+                    "update_docs": args.update_docs,
+                    "kb_path": args.kb_path,
                 }
             elif args.tool == "team_ask":
                 kwargs = {
@@ -131,7 +135,10 @@ def main() -> None:
                     "selftest": args.selftest,
                 }
             elif args.tool == "team_epic":
-                kwargs = {"plan": epic_plan, "budget": args.budget}
+                kwargs = {
+                    "plan": epic_plan, "budget": args.budget,
+                    "update_docs": args.update_docs, "kb_path": args.kb_path,
+                }
 
             await _run_workflow(router, ledger, config, args.tool, kwargs)
         finally:

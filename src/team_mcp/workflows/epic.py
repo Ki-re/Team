@@ -19,9 +19,10 @@ import asyncio
 
 from team_mcp.config import Config
 from team_mcp.engine.ledger import Ledger
+from team_mcp.engine.sandbox import Sandbox
 from team_mcp.engine.schemas import Manifest
 from team_mcp.providers.router import Router
-from team_mcp.workflows import feature
+from team_mcp.workflows import docs_sync, feature
 
 _WORKFLOW = "team_epic"
 
@@ -56,6 +57,8 @@ async def run(
     *,
     plan: list[dict],
     budget: int | None = None,
+    update_docs: bool = False,
+    kb_path: str | None = None,
 ) -> Manifest:
     if not plan:
         return Manifest(
@@ -128,6 +131,21 @@ async def run(
     completed = [nid for nid, r in results.items() if not r.get("skipped")]
     skipped = [nid for nid, r in results.items() if r.get("skipped")]
 
+    # una sola llamada de sincronización de docs para todo el epic (Fase 12
+    # del plan), no una por nodo — evita N llamadas redundantes al modelo
+    # cuando varios nodos tocan el mismo tema de documentación.
+    docs_note = ""
+    if update_docs and kb_path and completed:
+        change_summary = "\n".join(
+            f"- {nid}: {nodes[nid]['spec']}" for nid in completed
+        )
+        result = await docs_sync.run(
+            router, Sandbox(config), kb_path=kb_path,
+            changed_files=files_changed, change_summary=f"team_epic:\n{change_summary}",
+        )
+        files_changed = files_changed + result["applied"]
+        docs_note = result["note"]
+
     return Manifest(
         tool=_WORKFLOW,
         files_changed=files_changed,
@@ -137,6 +155,7 @@ async def run(
             f"{len(completed)}/{len(nodes)} nodos completados, {len(failed)} fallidos, "
             f"{len(skipped)} omitidos. Gasto~{spent_total} tokens (presupuesto {budget})."
             + (" PRESUPUESTO AGOTADO." if budget_exhausted else "")
+            + (f"\n\ndocs: {docs_note}" if docs_note else "")
         ),
         dry_run=config.dry_run,
     )

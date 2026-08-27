@@ -55,7 +55,15 @@ async def team_task(instruction: str, target_path: str) -> dict:
         "repro_command: un comando que hoy falla y debe pasar a salir con "
         "código 0), o revisar código sin generarlo (kind=review). Fan-out "
         "de N workers + consenso por validación cruzada + crítica premium "
-        "+ reparación acotada."
+        "+ reparación acotada. Si el proyecto tiene un knowledge-base en "
+        "markdown (carpeta con INDEX.md + un archivo por tema con "
+        "frontmatter, misma convención que la memoria de Claude — ver "
+        "docs/KB_CONVENTION.md), pasa update_docs=True y kb_path a esa "
+        "carpeta para que, tras un cambio exitoso, se actualicen los "
+        "archivos de KB EXISTENTES que quedaron desactualizados (no crea "
+        "entradas nuevas). Si el KB vive en un repo dedicado en vez de una "
+        "carpeta de este proyecto, su ruta local debe estar en "
+        "TEAM_SANDBOX_ROOTS o el write quedará rechazado por el sandbox."
     )
 )
 async def team_feature(
@@ -63,10 +71,13 @@ async def team_feature(
     target_paths: list[str],
     kind: Literal["new", "refactor", "fix", "review"] | None = None,
     repro_command: str | None = None,
+    update_docs: bool = False,
+    kb_path: str | None = None,
 ) -> dict:
     manifest = await feature.run(
         _router, _ledger, _config,
         spec=spec, target_paths=target_paths, kind=kind, repro_command=repro_command,
+        update_docs=update_docs, kb_path=kb_path,
     )
     return manifest.model_dump()
 
@@ -75,11 +86,19 @@ async def team_feature(
     description=(
         "Plan multi-tarea con dependencias (DAG). Orquesta team_feature "
         "sobre cada nodo en orden topológico, paralelizando ramas "
-        "independientes, con presupuesto de tokens global."
+        "independientes, con presupuesto de tokens global. update_docs/"
+        "kb_path: igual que en team_feature, pero UNA sola sincronización "
+        "de documentación al final de todo el epic (no una por nodo)."
     )
 )
-async def team_epic(plan: list[dict], budget: int | None = None) -> dict:
-    manifest = await epic.run(_router, _ledger, _config, plan=plan, budget=budget)
+async def team_epic(
+    plan: list[dict], budget: int | None = None,
+    update_docs: bool = False, kb_path: str | None = None,
+) -> dict:
+    manifest = await epic.run(
+        _router, _ledger, _config, plan=plan, budget=budget,
+        update_docs=update_docs, kb_path=kb_path,
+    )
     return manifest.model_dump()
 
 

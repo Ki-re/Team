@@ -6,6 +6,25 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 
 ## [Unreleased]
 
+### Added
+- `update_docs`/`kb_path` opcionales en `team_feature`/`team_epic`: tras un
+  cambio de código exitoso, un subagente de documentación (`docs_sync`)
+  decide qué archivos de un knowledge-base en markdown (frontmatter +
+  `INDEX.md`, misma convención que la memoria de Claude — ver
+  `docs/KB_CONVENTION.md`) quedaron desactualizados y los actualiza. Dos
+  pasadas (selección barata sobre el índice, luego edición con contenido
+  real por archivo, con reintento) — una primera versión de una sola
+  pasada falló en la primera prueba en vivo porque el modelo no tenía
+  texto real que copiar para el bloque `search`. Solo actualiza entradas
+  existentes, nunca crea nuevas en esta versión.
+- `team_validate`: cuando `scope` es un directorio con `INDEX.md`, añade
+  chequeos deterministas y gratuitos de frontmatter YAML inválido
+  (bloqueante), links relativos rotos y entradas con `last_verified`
+  vencido (ambos informativos).
+- `engine/frontmatter.py`: parseo de frontmatter y utilidades de KB
+  (índice barato, detección de links rotos, staleness), reutilizado por
+  `docs_sync` y `team_validate`.
+
 ## [1.0.0] - 2026-08-27
 
 Primera versión pública. Las 5 tools MCP (`team_task`, `team_feature`,

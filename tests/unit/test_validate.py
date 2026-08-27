@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from team_mcp.workflows.validate import _check_secrets, _check_syntax, _collect_py_files
+from team_mcp.workflows.validate import _check_kb_frontmatter, _check_secrets, _check_syntax, _collect_py_files
 
 
 def test_collect_py_files_single_file(tmp_path: Path):
@@ -72,3 +72,26 @@ def test_check_secrets_short_password_value_not_flagged(tmp_path: Path):
     f.write_text('password = "abc"\n')
     ok, _ = _check_secrets([f])
     assert ok is True
+
+
+def test_check_kb_frontmatter_ignores_index_and_files_without_frontmatter(tmp_path: Path):
+    (tmp_path / "INDEX.md").write_text("- [a](a.md) — desc\n")
+    (tmp_path / "sin_frontmatter.md").write_text("solo texto\n")
+    ok, detail = _check_kb_frontmatter(tmp_path)
+    assert ok is True
+    assert detail == ""
+
+
+def test_check_kb_frontmatter_passes_valid_frontmatter(tmp_path: Path):
+    (tmp_path / "a.md").write_text("---\nname: a\ndescription: x\n---\ncontenido\n")
+    ok, detail = _check_kb_frontmatter(tmp_path)
+    assert ok is True
+    assert detail == ""
+
+
+def test_check_kb_frontmatter_flags_broken_frontmatter(tmp_path: Path):
+    f = tmp_path / "roto.md"
+    f.write_text("---\nname: [sin cerrar\n---\ncontenido\n")
+    ok, detail = _check_kb_frontmatter(tmp_path)
+    assert ok is False
+    assert "roto.md" in detail

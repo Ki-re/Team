@@ -19,6 +19,7 @@ from pathlib import Path
 
 from team_mcp.config import Config
 from team_mcp.engine.critic import review as critic_review
+from team_mcp.engine.frontmatter import check_dangling_links, check_stale, list_kb_entries, split_frontmatter
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.schemas import FileEdit, Manifest
 from team_mcp.providers.router import Router
@@ -110,6 +111,24 @@ def _check_lint(py_files: list[Path], scope: Path) -> str:
     return "sin hallazgos" if proc.returncode == 0 else proc.stdout[-1000:]
 
 
+def _check_kb_frontmatter(kb_path: Path) -> tuple[bool, str]:
+    """Fase 12 del plan: bloqueante igual que _check_syntax, pero solo para
+    archivos que claramente pretenden tener frontmatter (empiezan por
+    `---`) — un .md cualquiera sin frontmatter no es un error, INDEX.md
+    tampoco lo exige."""
+    errors = []
+    for f in sorted(kb_path.rglob("*.md")):
+        if f.name.upper() == "INDEX.MD":
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if not text.lstrip().startswith("---"):
+            continue
+        fm, _ = split_frontmatter(text)
+        if fm is None:
+            errors.append(str(f))
+    return not errors, "; ".join(errors[:10])
+
+
 async def run(
     router: Router,
     ledger: Ledger,
@@ -154,6 +173,21 @@ async def run(
 
     warnings = [f"lint: {lint_detail}"] if lint_detail != "sin hallazgos" else []
     warnings.append(f"git: {git_status}")
+
+    # Fase 12 del plan: si scope parece un directorio de knowledge-base
+    # (tiene INDEX.md), aplica los mismos chequeos deterministas de
+    # docs_sync.py — gratis, sin consultar a ningún modelo.
+    kb_dir = scope_path if scope_path.is_dir() else None
+    if kb_dir and (kb_dir / "INDEX.md").exists():
+        kb_ok, kb_detail = _check_kb_frontmatter(kb_dir)
+        if not kb_ok:
+            blockers.append(f"frontmatter de KB inválido: {kb_detail}")
+        dangling = check_dangling_links(kb_dir)
+        if dangling:
+            warnings.append("KB, links rotos: " + "; ".join(dangling[:10]))
+        stale = check_stale(list_kb_entries(kb_dir))
+        if stale:
+            warnings.append("KB, entradas desactualizadas: " + "; ".join(stale[:10]))
 
     if spec_original:
         try:

@@ -1,0 +1,1 @@
+- [Limites del sistema](limites.md) - documenta los limites configurables actuales.

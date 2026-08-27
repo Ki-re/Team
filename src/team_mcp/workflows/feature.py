@@ -35,6 +35,7 @@ from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
 from team_mcp.engine.schemas import CriticFinding, FeatureKind, FileEdit, Manifest, Severity
 from team_mcp.engine.verify import VerifyTarget, verify_candidate
 from team_mcp.providers.router import Router
+from team_mcp.workflows import docs_sync
 
 _WORKFLOW = "team_feature"
 _N_WORKERS = 3
@@ -157,6 +158,22 @@ def _to_target_paths(edits: list[FileEdit], target_paths: list[str]) -> list[Fil
     return result
 
 
+async def _maybe_sync_docs(
+    router: Router, sandbox: Sandbox, *,
+    update_docs: bool, kb_path: str | None, changed_files: list[str], change_summary: str,
+) -> tuple[list[str], str]:
+    """Fase 12 del plan: modo opcional, best-effort. No hace nada salvo que
+    el caller pida update_docs=True y dé un kb_path; cualquier fallo dentro
+    de docs_sync ya vuelve como nota en vez de excepción (ver docs_sync.py),
+    así que aquí no hace falta un try/except propio."""
+    if not (update_docs and kb_path) or not changed_files:
+        return [], ""
+    result = await docs_sync.run(
+        router, sandbox, kb_path=kb_path, changed_files=changed_files, change_summary=change_summary,
+    )
+    return result["applied"], result["note"]
+
+
 async def _run_repro(cmd: list[str], workdir: Path, timeout_s: float = 60.0) -> tuple[bool, str]:
     """Ejecuta el repro_command del usuario tal cual, sin interpretarlo como
     pytest. El criterio de aceptación es el código de salida: 0 = pasa."""
@@ -218,6 +235,7 @@ async def _generate_candidate(
 
 async def _run_new(
     router: Router, ledger: Ledger, config: Config, spec: str, target_paths: list[str],
+    *, update_docs: bool = False, kb_path: str | None = None,
 ) -> Manifest:
     base_files = await _read_base_files(target_paths)
 
@@ -296,14 +314,20 @@ async def _run_new(
             dry_run=config.dry_run,
         )
 
+    docs_changed, docs_note = await _maybe_sync_docs(
+        router, sandbox, update_docs=update_docs, kb_path=kb_path,
+        changed_files=changed, change_summary=f"team_feature kind=new: {spec}",
+    )
+
     return Manifest(
         tool=_WORKFLOW, kind=FeatureKind.new,
-        files_changed=changed, tests_status="green",
+        files_changed=changed + docs_changed, tests_status="green",
         critic_findings_open=0,
         provider_used=provider_used,
         summary=(
             f"implementado con {len(candidates)} candidatos "
             f"(ganador={winner.id}, score={consensus.scores.get(winner.id, 0):.2f})"
+            + (f"\n\ndocs: {docs_note}" if docs_note else "")
         ),
         dry_run=config.dry_run,
     )
@@ -311,6 +335,7 @@ async def _run_new(
 
 async def _run_refactor(
     router: Router, ledger: Ledger, config: Config, spec: str, target_paths: list[str],
+    *, update_docs: bool = False, kb_path: str | None = None,
 ) -> Manifest:
     """kind=refactor: preservar comportamiento es la regla dura, no una más.
 
@@ -424,9 +449,17 @@ async def _run_refactor(
             dry_run=config.dry_run,
         )
 
+    docs_changed, docs_note = await _maybe_sync_docs(
+        router, sandbox, update_docs=update_docs, kb_path=kb_path,
+        changed_files=changed, change_summary=f"team_feature kind=refactor: {spec}",
+    )
+
     return Manifest(
-        tool=_WORKFLOW, kind=FeatureKind.refactor, files_changed=changed, tests_status="green",
-        summary=f"refactor aplicado, comportamiento preservado ({len(candidates)} candidatos evaluados)",
+        tool=_WORKFLOW, kind=FeatureKind.refactor, files_changed=changed + docs_changed, tests_status="green",
+        summary=(
+            f"refactor aplicado, comportamiento preservado ({len(candidates)} candidatos evaluados)"
+            + (f"\n\ndocs: {docs_note}" if docs_note else "")
+        ),
         dry_run=config.dry_run,
     )
 
@@ -434,6 +467,7 @@ async def _run_refactor(
 async def _run_fix(
     router: Router, ledger: Ledger, config: Config, spec: str, target_paths: list[str],
     repro_command: str | None,
+    *, update_docs: bool = False, kb_path: str | None = None,
 ) -> Manifest:
     """kind=fix: el `repro_command` del usuario es la verdad, no algo que un
     modelo reescribe. Sin rojo->verde real en ese comando no hay entrega."""
@@ -559,12 +593,18 @@ async def _run_fix(
             dry_run=config.dry_run,
         )
 
+    docs_changed, docs_note = await _maybe_sync_docs(
+        router, sandbox, update_docs=update_docs, kb_path=kb_path,
+        changed_files=changed, change_summary=f"team_feature kind=fix: {spec}",
+    )
+
     return Manifest(
-        tool=_WORKFLOW, kind=FeatureKind.fix, files_changed=changed, tests_status="green",
+        tool=_WORKFLOW, kind=FeatureKind.fix, files_changed=changed + docs_changed, tests_status="green",
         critic_findings_open=len(blocking), provider_used=provider_used,
         summary=(
             f"bug corregido: repro_command pasa a salir con código 0 "
             f"({len(candidates)} parches evaluados)"
+            + (f"\n\ndocs: {docs_note}" if docs_note else "")
         ),
         dry_run=config.dry_run,
     )
@@ -633,15 +673,24 @@ async def run(
     target_paths: list[str],
     kind: str | None = None,
     repro_command: str | None = None,
+    update_docs: bool = False,
+    kb_path: str | None = None,
 ) -> Manifest:
     resolved_kind = kind or "new"
 
     if resolved_kind == "new":
-        return await _run_new(router, ledger, config, spec, target_paths)
+        return await _run_new(
+            router, ledger, config, spec, target_paths, update_docs=update_docs, kb_path=kb_path,
+        )
     if resolved_kind == "refactor":
-        return await _run_refactor(router, ledger, config, spec, target_paths)
+        return await _run_refactor(
+            router, ledger, config, spec, target_paths, update_docs=update_docs, kb_path=kb_path,
+        )
     if resolved_kind == "fix":
-        return await _run_fix(router, ledger, config, spec, target_paths, repro_command)
+        return await _run_fix(
+            router, ledger, config, spec, target_paths, repro_command,
+            update_docs=update_docs, kb_path=kb_path,
+        )
     if resolved_kind == "review":
         return await _run_review(router, ledger, config, spec, target_paths)
 

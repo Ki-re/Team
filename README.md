@@ -15,16 +15,23 @@ desarrollo (contiene datos de cuenta del autor) y no se publica en el repo.
   UI en `http://203.0.113.10:4000/ui`.
 - **Servidor MCP**: registrado globalmente en Claude Code (`claude mcp add team --scope user`),
   disponible en cualquier proyecto, no solo este repo.
-- **Las 5 tools completas y verificadas en vivo** contra el gateway real (ver
-  `.claude/plans` para el detalle, Fases 1-9): `team_task`, los 4 `kind` de
-  `team_feature` (`new`/`refactor`/`fix`/`review`), `team_ask` (map-reduce +
-  citas + búsqueda web opcional vía Tavily), `team_epic` (DAG con
-  dependencias y presupuesto real) y `team_validate` (GO/NO-GO + `selftest`).
-  Ninguna es un stub.
-- **Suite de tests propia**: `tests/unit/` (77 tests, `pytest`) sobre toda
+- **Las 5 tools completas y verificadas en vivo** contra el gateway real
+  (ver [CHANGELOG.md](CHANGELOG.md) para el detalle): `team_task`, los 4
+  `kind` de `team_feature` (`new`/`refactor`/`fix`/`review`), `team_ask`
+  (map-reduce + citas + búsqueda web opcional vía Tavily), `team_epic`
+  (DAG con dependencias y presupuesto real) y `team_validate` (GO/NO-GO +
+  `selftest`). Ninguna es un stub.
+- **Sincronización de knowledge-base opcional** (`update_docs`/`kb_path`
+  en `team_feature`/`team_epic`, ver [docs/KB_CONVENTION.md](docs/KB_CONVENTION.md)):
+  tras un cambio de código exitoso, actualiza los archivos de un KB en
+  markdown (frontmatter + `INDEX.md`, misma convención que la memoria de
+  Claude) que quedaron desactualizados. Solo actualiza entradas
+  existentes, no crea nuevas. `team_validate` audita el KB en sí
+  (frontmatter/links rotos/staleness) sin necesidad de `update_docs`.
+- **Suite de tests propia**: `tests/unit/` (103 tests, `pytest`) sobre toda
   la lógica determinista/local — sandbox, verify, consenso, reparación,
-  parseo JSON, el DAG de `team_epic`, `team_validate`, config, router (nota
-  del ledger), agy (motivo del fallback). Los caminos
+  parseo JSON, frontmatter/KB, el DAG de `team_epic`, `team_validate`,
+  config, router (nota del ledger), agy (motivo del fallback). Los caminos
   con modelos en vivo se siguen verificando manualmente contra el gateway
   real, no en esta suite (mockear o gastar cuota en cada corrida sería el
   trade-off equivocado en este punto del proyecto).
