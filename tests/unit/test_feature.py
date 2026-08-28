@@ -5,8 +5,8 @@ from team_mcp.workflows.feature import _force_basename, _generate_candidate
 
 
 class _RaisingRouter:
-    """router.coder() siempre falla con una excepción concreta — simula lo
-    que antes se perdía (timeout, 429, etc. quedaban todos como `None`)."""
+    """router.coder() always fails with a concrete exception — simulates
+    what used to get lost (timeout, 429, etc. all ended up as `None`)."""
 
     def __init__(self, exc: Exception):
         self._exc = exc
@@ -21,13 +21,13 @@ class _OkRouter:
 
 
 async def test_generate_candidate_propagates_real_error_on_failure():
-    router = _RaisingRouter(TimeoutError("tras 120.0s"))
+    router = _RaisingRouter(TimeoutError("after 120.0s"))
     candidate, error = await _generate_candidate(router, "w1", "spec", ["a.py"], {"a.py": ""})
     assert candidate is None
     assert error is not None
     assert "w1" in error
     assert "TimeoutError" in error
-    assert "tras 120.0s" in error
+    assert "after 120.0s" in error
 
 
 async def test_generate_candidate_returns_candidate_and_no_error_on_success():
@@ -40,10 +40,11 @@ async def test_generate_candidate_returns_candidate_and_no_error_on_success():
 
 
 def test_force_basename_strips_directories_from_model_output():
-    # bug real encontrado en vivo: un worker de kind=fix copio una ruta con
-    # subcarpeta del repro_command en vez de usar el basename, rompiendo la
-    # verificacion en scratch (EditConflict "no existe") antes de llegar a
-    # _to_target_paths, que solo normaliza justo antes de la escritura final.
+    # real bug found live: a kind=fix worker copied a path with a
+    # subfolder from repro_command instead of using the basename,
+    # breaking scratch verification (EditConflict "doesn't exist") before
+    # ever reaching _to_target_paths, which only normalizes right before
+    # the final write.
     edits = [
         FileEdit(path="playground/selfreview_bug.py", search="", replace="x = 1\n"),
         FileEdit(path="already_flat.py", search="", replace="y = 2\n"),

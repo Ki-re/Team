@@ -1,8 +1,8 @@
-"""Cache hash(prompt+modelo+params) -> resultado.
+"""Cache hash(prompt+model+params) -> result.
 
-Los bucles de reparación acotados (engine/repair.py) repiten variaciones
-pequeñas del mismo prompt contra el mismo modelo; esto evita pagar tokens
-dos veces por el mismo trabajo dentro de una misma ejecución de pipeline.
+Bounded repair loops (engine/repair.py) repeat small variations of the
+same prompt against the same model; this avoids paying tokens twice for
+the same work within a single pipeline run.
 """
 
 from __future__ import annotations

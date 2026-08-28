@@ -1,9 +1,9 @@
-"""Extracción/parseo de JSON de respuestas de modelo, con cadena de rescate.
+"""JSON extraction/parsing from model responses, with a rescue chain.
 
-Los modelos pequeños producen JSON roto con frecuencia (primitiva #5 del
-plan): parse directo -> si falla, una reparación barata con tier-fast -> si
-sigue fallando, error duro. Nunca se reintenta más de una vez: si tier-fast
-tampoco puede arreglarlo, el problema es real.
+Small models produce broken JSON frequently (plan primitive #5): direct
+parse -> if it fails, a cheap repair with tier-fast -> if it still fails,
+a hard error. Never retried more than once: if tier-fast can't fix it
+either, the problem is real.
 """
 
 from __future__ import annotations
@@ -21,14 +21,14 @@ class JsonExtractionError(ValueError):
     pass
 
 
-# los modelos "razonadores" (algunos de tier-coder/tier-context vía
-# OpenRouter) a veces filtran su cadena de pensamiento envuelta en estas
-# etiquetas ANTES del JSON pedido. Si ese bloque contiene aunque sea una
-# sola llave suelta (frecuente: el modelo "piensa en voz alta" sobre la
-# forma del JSON que va a producir), el regex greedy de abajo la toma como
-# inicio del match y cruza hasta el `}` real final, produciendo un slice
-# inválido — visto fallar en producción (reportado como "backend leaking
-# <think> tags"). Se recortan enteros antes de buscar JSON.
+# "reasoning" models (some tier-coder/tier-context ones via OpenRouter)
+# sometimes leak their chain of thought wrapped in these tags BEFORE the
+# requested JSON. If that block contains even a single stray brace
+# (common: the model "thinks out loud" about the shape of the JSON it's
+# about to produce), the greedy regex below takes it as the start of the
+# match and crosses over to the real final `}`, producing an invalid
+# slice — seen failing in production (reported as "backend leaking
+# <think> tags"). They're stripped whole before searching for JSON.
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>|<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE)
 
 
@@ -38,14 +38,14 @@ def extract_json(raw: str) -> dict | list:
     arr_match = re.search(r"\[.*\]", raw, re.DOTALL)
     candidates = [m.group(0) for m in (obj_match, arr_match) if m]
     if not candidates:
-        raise JsonExtractionError(f"sin JSON en la respuesta del modelo: {raw[:200]}")
+        raise JsonExtractionError(f"no JSON in the model's response: {raw[:200]}")
 
-    # el regex es greedy: si hay un array suelto ANTES de un objeto real (o
-    # viceversa), el match del array se extiende hasta el último `]` del
-    # texto, cruzando por encima del objeto y produciendo un slice inválido
-    # (visto fallar en tests). Por eso no basta con "el más largo" a ciegas:
-    # se intenta parsear cada candidato y solo se compara longitud entre los
-    # que de verdad son JSON válido.
+    # the regex is greedy: if there's a bare array BEFORE a real object (or
+    # vice versa), the array match extends to the text's last `]`, crossing
+    # over the object and producing an invalid slice (seen failing in
+    # tests). So "the longest one" blindly isn't enough: each candidate is
+    # actually parsed, and length is only compared among the ones that are
+    # genuinely valid JSON.
     parsed: list[tuple[str, dict | list]] = []
     last_error: Exception | None = None
     for text in candidates:
@@ -56,7 +56,7 @@ def extract_json(raw: str) -> dict | list:
 
     if not parsed:
         raise JsonExtractionError(
-            f"JSON encontrado pero no parsea ({last_error}): {raw[:200]}"
+            f"JSON found but doesn't parse ({last_error}): {raw[:200]}"
         )
 
     _, best_value = max(parsed, key=lambda pair: len(pair[0]))
@@ -64,31 +64,31 @@ def extract_json(raw: str) -> dict | list:
 
 
 def extract_json_dict(raw: str) -> dict:
-    """Como extract_json, pero exige que el resultado sea un objeto, no una
-    lista. La mayoría de los prompts del proyecto piden un objeto con
-    campos concretos (p.ej. {"edits": [...]}) — sin esto, un worker que
-    devuelve una lista suelta producía un TypeError críptico más adelante
-    (`list indices must be integers, not str`) en vez de un error claro."""
+    """Like extract_json, but requires the result to be an object, not a
+    list. Most prompts in this project ask for an object with concrete
+    fields (e.g. {"edits": [...]}) — without this, a worker that returns a
+    bare list produced a cryptic TypeError further down
+    (`list indices must be integers, not str`) instead of a clear error."""
     data = extract_json(raw)
     if not isinstance(data, dict):
         raise JsonExtractionError(
-            f"se esperaba un objeto JSON, se obtuvo una lista: {raw[:200]}"
+            f"expected a JSON object, got a list: {raw[:200]}"
         )
     return data
 
 
 async def parse_or_repair(raw: str, schema: type[T], router, workflow: str) -> T:
-    """router: providers.router.Router — se evita el import directo para no
-    crear un ciclo (router no depende de engine, pero se mantiene laxo)."""
+    """router: providers.router.Router — the direct import is avoided to
+    prevent a cycle (router doesn't depend on engine, but this keeps it loose)."""
     try:
         return schema.model_validate(extract_json(raw))
     except (JsonExtractionError, ValidationError, json.JSONDecodeError) as exc:
         repair_prompt = (
-            "El siguiente texto debería ser un JSON válido que cumpla este "
-            f"esquema (JSON Schema): {schema.model_json_schema()}\n\n"
-            f"Texto a corregir:\n{raw}\n\n"
-            f"Error de validación: {exc}\n\n"
-            "Devuelve ÚNICAMENTE el JSON corregido, sin texto adicional ni markdown."
+            "The following text should be valid JSON matching this "
+            f"schema (JSON Schema): {schema.model_json_schema()}\n\n"
+            f"Text to fix:\n{raw}\n\n"
+            f"Validation error: {exc}\n\n"
+            "Return ONLY the fixed JSON, with no extra text or markdown."
         )
         fixed_raw = await router.fast(workflow, repair_prompt, temperature=0.0)
         return schema.model_validate(extract_json(fixed_raw))

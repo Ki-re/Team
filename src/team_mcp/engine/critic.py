@@ -1,10 +1,11 @@
-"""Crítica adversarial (primitiva #3 del plan).
+"""Adversarial critique (plan primitive #3).
 
-Rúbrica fija, no "revisa esto". El crítico corre en tier-premium (agy o su
-fallback), de familia de modelo distinta a tier-coder, para no correlacionar
-errores. El filtro anti-falso-positivo real vive en el schema: CriticFinding
-exige `failure_scenario`, así que un hallazgo sin escenario concreto ni
-siquiera pasa la validación pydantic — se descarta en el parseo, no después.
+Fixed rubric, not "review this". The critic runs on tier-premium (agy or
+its fallback), from a different model family than tier-coder, so errors
+don't correlate. The real anti-false-positive filter lives in the schema:
+CriticFinding requires a `failure_scenario`, so a finding without a
+concrete scenario doesn't even pass pydantic validation — it's discarded
+at parse time, not after.
 """
 
 from __future__ import annotations
@@ -13,39 +14,39 @@ from team_mcp.engine.jsonio import parse_or_repair
 from team_mcp.engine.schemas import CriticReport, FileEdit
 
 _DEFAULT_FOCUS = """\
-Evalúa ÚNICAMENTE estos criterios:
+Assess ONLY these criteria:
 
-1. correctness: ¿hace lo que la spec pide, en todos los casos, no solo el feliz?
-2. edge_cases: ¿entradas vacías, nulas, límites, tipos inesperados?
-3. security: ¿inyección, path traversal, deserialización insegura, secretos?
-4. contract_adherence: ¿respeta las APIs/convenciones del código circundante?
-5. simplicity: ¿hay complejidad injustificada para lo que pide la spec?
+1. correctness: does it do what the spec asks, in every case, not just the happy path?
+2. edge_cases: empty/null inputs, boundaries, unexpected types?
+3. security: injection, path traversal, unsafe deserialization, secrets?
+4. contract_adherence: does it respect the surrounding code's APIs/conventions?
+5. simplicity: is there unjustified complexity for what the spec asks?
 """
 
 _RUBRIC = """\
-Eres un revisor de código adversarial. Tu trabajo es encontrar problemas
-reales, no elogiar el código. {focus}
+You're an adversarial code reviewer. Your job is to find real problems,
+not to praise the code. {focus}
 
-Spec original:
+Original spec:
 {spec}
 
-Código a revisar:
+Code to review:
 {code}
 
-Para CADA hallazgo, debes poder describir un `failure_scenario` CONCRETO:
-entradas específicas que producen una salida incorrecta o un crash. Si no
-puedes construir ese escenario, NO reportes el hallazgo — una sospecha vaga
-no cuenta.
+For EVERY finding, you must be able to describe a CONCRETE
+`failure_scenario`: specific inputs that produce an incorrect output or a
+crash. If you can't construct that scenario, DON'T report the finding — a
+vague suspicion doesn't count.
 
-Responde ÚNICAMENTE con JSON con esta forma exacta (lista vacía si no hay
-hallazgos reales):
+Respond ONLY with JSON in this exact shape (empty list if there are no
+real findings):
 {{"findings": [
   {{"severity": "low|medium|high|critical",
-    "file": "<ruta>",
-    "line": <número o null>,
-    "claim": "<qué está mal, en una frase>",
-    "failure_scenario": "<entrada concreta -> salida/comportamiento incorrecto>",
-    "suggested_fix": "<opcional>"}}
+    "file": "<path>",
+    "line": <number or null>,
+    "claim": "<what's wrong, in one sentence>",
+    "failure_scenario": "<concrete input -> incorrect output/behavior>",
+    "suggested_fix": "<optional>"}}
 ]}}
 """
 

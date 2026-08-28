@@ -1,16 +1,16 @@
-"""team_epic: orquesta team_feature sobre un DAG (Fase 8 del plan).
+"""team_epic: orchestrates team_feature over a DAG (plan Phase 8).
 
-Cada nodo del plan es `{id, spec, target_paths, kind?, repro_command?,
-depends_on?}` y se ejecuta vía `feature.run()` tal cual, sin tocarlo. Orden
-topológico por oleadas (Kahn): los nodos con todas sus dependencias
-resueltas corren en paralelo. Un nodo cuya dependencia falló se marca
-`skipped`, no se ejecuta ni se cuenta como fallo propio.
+Each node of the plan is `{id, spec, target_paths, kind?, repro_command?,
+depends_on?}` and runs via `feature.run()` as-is, untouched. Topological
+order by waves (Kahn): nodes with all their dependencies resolved run in
+parallel. A node whose dependency failed gets marked `skipped`, not run
+and not counted as its own failure.
 
-Presupuesto real: delta de `ledger.spent_tokens("team_feature")` antes/
-después de cada oleada, acumulado contra `budget`. Deliberadamente no se
-usa `Ledger.check_budget` con un id compartido — la tabla `spend` es
-global y persistente, y otra llamada a team_feature fuera de este epic
-contaminaría el conteo si se usara una clave fija.
+Real budget: delta of `ledger.spent_tokens("team_feature")` before/after
+each wave, accumulated against `budget`. Deliberately not using
+`Ledger.check_budget` with a shared id — the `spend` table is global and
+persistent, and another call to team_feature outside this epic would
+contaminate the count if a fixed key were used.
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ _WORKFLOW = "team_epic"
 def _validate_plan(plan: list[dict]) -> str | None:
     ids = {n.get("id") for n in plan}
     if len(ids) != len(plan):
-        return "hay ids duplicados en el plan"
+        return "there are duplicate ids in the plan"
     for n in plan:
         if "id" not in n or "spec" not in n:
-            return f"nodo sin 'id' o 'spec': {n}"
+            return f"node missing 'id' or 'spec': {n}"
         for dep in n.get("depends_on", []):
             if dep not in ids:
-                return f"nodo '{n['id']}' depende de '{dep}', que no existe en el plan"
+                return f"node '{n['id']}' depends on '{dep}', which doesn't exist in the plan"
     return None
 
 
@@ -63,19 +63,20 @@ async def run(
     if not plan:
         return Manifest(
             tool=_WORKFLOW, tests_status="not_run",
-            summary="plan vacío, nada que ejecutar", dry_run=config.dry_run,
+            summary="empty plan, nothing to run", dry_run=config.dry_run,
         )
 
     error = _validate_plan(plan)
     if error:
         return Manifest(
             tool=_WORKFLOW, tests_status="not_run",
-            summary=f"plan inválido: {error}", dry_run=config.dry_run,
+            summary=f"invalid plan: {error}", dry_run=config.dry_run,
         )
 
-    # ojo: "budget or default" trataría budget=0 como "no especificado" (0
-    # es falsy) y caería al default, justo lo contrario de lo que pide un
-    # budget=0 explícito (agotar todo de inmediato) — visto fallar en pruebas.
+    # careful: "budget or default" would treat budget=0 as "not
+    # specified" (0 is falsy) and fall back to the default, exactly the
+    # opposite of what an explicit budget=0 asks for (exhaust immediately)
+    # — seen failing in testing.
     budget = config.token_budget_default if budget is None else budget
     nodes = {n["id"]: n for n in plan}
     done: set[str] = set()
@@ -88,11 +89,11 @@ async def run(
     while remaining:
         ready = [nid for nid in remaining if all(d in done for d in nodes[nid].get("depends_on", []))]
         if not ready:
-            break  # ciclo: nada puede avanzar, se reporta abajo
+            break  # cycle: nothing can advance, reported below
 
         blocked = [nid for nid in ready if any(d in failed for d in nodes[nid].get("depends_on", []))]
         for nid in blocked:
-            results[nid] = {"skipped": True, "reason": "dependencia fallida"}
+            results[nid] = {"skipped": True, "reason": "failed dependency"}
             done.add(nid)
             remaining.discard(nid)
 
@@ -103,7 +104,7 @@ async def run(
         if budget_exhausted or spent_total >= budget:
             budget_exhausted = True
             for nid in runnable:
-                results[nid] = {"skipped": True, "reason": "presupuesto agotado"}
+                results[nid] = {"skipped": True, "reason": "budget exhausted"}
                 done.add(nid)
                 remaining.discard(nid)
             continue
@@ -123,7 +124,7 @@ async def run(
                 failed.add(nid)
 
     for nid in remaining:
-        results[nid] = {"skipped": True, "reason": "ciclo detectado en depends_on"}
+        results[nid] = {"skipped": True, "reason": "cycle detected in depends_on"}
 
     files_changed = [
         f for r in results.values() if isinstance(r, dict) for f in r.get("files_changed", []) or []
@@ -131,9 +132,9 @@ async def run(
     completed = [nid for nid, r in results.items() if not r.get("skipped")]
     skipped = [nid for nid, r in results.items() if r.get("skipped")]
 
-    # una sola llamada de sincronización de docs para todo el epic (Fase 12
-    # del plan), no una por nodo — evita N llamadas redundantes al modelo
-    # cuando varios nodos tocan el mismo tema de documentación.
+    # a single docs-sync call for the whole epic (plan Phase 12), not one
+    # per node — avoids N redundant model calls when several nodes touch
+    # the same documentation topic.
     docs_note = ""
     if update_docs and kb_path and completed:
         change_summary = "\n".join(
@@ -152,9 +153,9 @@ async def run(
         tests_status="red" if failed else ("green" if completed else "not_run"),
         tokens_used={"team_feature": spent_total},
         summary=(
-            f"{len(completed)}/{len(nodes)} nodos completados, {len(failed)} fallidos, "
-            f"{len(skipped)} omitidos. Gasto~{spent_total} tokens (presupuesto {budget})."
-            + (" PRESUPUESTO AGOTADO." if budget_exhausted else "")
+            f"{len(completed)}/{len(nodes)} nodes completed, {len(failed)} failed, "
+            f"{len(skipped)} skipped. Spent~{spent_total} tokens (budget {budget})."
+            + (" BUDGET EXHAUSTED." if budget_exhausted else "")
             + (f"\n\ndocs: {docs_note}" if docs_note else "")
         ),
         dry_run=config.dry_run,

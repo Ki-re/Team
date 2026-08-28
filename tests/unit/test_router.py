@@ -21,9 +21,9 @@ async def test_call_failure_records_real_error_in_ledger_note(make_config):
     router = Router(config, ledger)
 
     async def _raise(*args, **kwargs):
-        raise TimeoutError("gateway no respondió tras 120.0s")
+        raise TimeoutError("gateway didn't respond after 120.0s")
 
-    router.gateway.chat = _raise  # monkeypatch: sin tocar la red real
+    router.gateway.chat = _raise  # monkeypatch: no real network involved
 
     with pytest.raises(TimeoutError):
         await router.fast("wf", "prompt")
@@ -39,13 +39,13 @@ async def test_premium_review_records_agy_fallback_reason_in_note(make_config):
     router = Router(config, ledger)
 
     async def _complete(prompt, **kwargs):
-        return "respuesta del fallback"
+        return "fallback response"
 
     router.premium.complete = _complete
     router.premium.last_used = "fallback"
-    router.premium.last_error = "RuntimeError: agy exit=1: algo falló"
+    router.premium.last_error = "RuntimeError: agy exit=1: something failed"
 
     await router.premium_review("wf", "prompt")
 
     note = _last_note(ledger)
-    assert note == "RuntimeError: agy exit=1: algo falló"
+    assert note == "RuntimeError: agy exit=1: something failed"

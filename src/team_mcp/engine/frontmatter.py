@@ -1,11 +1,11 @@
-"""Frontmatter YAML + convención de knowledge-base (Fase 12 del plan).
+"""YAML frontmatter + knowledge-base convention (plan Phase 12).
 
-Mismo patrón que el propio sistema de memoria de Claude: un archivo .md por
-tema con un bloque frontmatter YAML al principio (name/description/tags/
-last_verified) y un INDEX.md que lista cada tema en una línea. Ver
-docs/KB_CONVENTION.md para el estándar completo — este módulo solo
-implementa las partes deterministas y puras (parseo, detección de enlaces
-rotos, staleness), sin tocar el filesystem fuera de lectura.
+Same pattern as Claude's own memory system: one .md file per topic with a
+YAML frontmatter block at the top (name/description/tags/last_verified)
+and an INDEX.md that lists each topic on one line. See
+docs/KB_CONVENTION.md for the full standard — this module only implements
+the deterministic, pure parts (parsing, broken-link detection, staleness),
+without touching the filesystem beyond reading.
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ _LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
 def split_frontmatter(text: str) -> tuple[dict | None, str]:
-    """(frontmatter, cuerpo). frontmatter=None si no hay bloque `---`
-    inicial, si no parsea como YAML válido, o si no es un dict (una lista
-    o escalar sueltos no cuentan como frontmatter válido aquí)."""
+    """(frontmatter, body). frontmatter=None if there's no initial `---`
+    block, if it doesn't parse as valid YAML, or if it isn't a dict (a
+    bare list or scalar doesn't count as valid frontmatter here)."""
     m = _FRONTMATTER_RE.match(text)
     if not m:
         return None, text
@@ -37,10 +37,10 @@ def split_frontmatter(text: str) -> tuple[dict | None, str]:
 
 
 def list_kb_entries(kb_path: Path) -> list[dict]:
-    """Escanea kb_path por archivos .md (excluyendo INDEX.md) con
-    frontmatter válido. Deliberadamente NO lee el cuerpo completo más allá
-    del frontmatter en el resultado — es el índice barato que se le pasa
-    al modelo, no una relectura de todo el KB."""
+    """Scans kb_path for .md files (excluding INDEX.md) with valid
+    frontmatter. Deliberately does NOT read the full body beyond the
+    frontmatter into the result — it's the cheap index handed to the
+    model, not a re-read of the whole KB."""
     entries = []
     for f in sorted(kb_path.rglob("*.md")):
         if f.name.upper() == "INDEX.MD":
@@ -63,8 +63,8 @@ def list_kb_entries(kb_path: Path) -> list[dict]:
 
 
 def find_local_links(text: str) -> list[str]:
-    """Targets de markdown links que parecen rutas relativas locales (ni
-    URL con esquema `algo://`, ni solo un ancla `#...`, ni `mailto:`)."""
+    """Targets of markdown links that look like local relative paths
+    (not a `scheme://` URL, not just an anchor `#...`, not `mailto:`)."""
     targets = []
     for target in _LINK_RE.findall(text):
         target = target.split("#", 1)[0].strip()
@@ -75,8 +75,8 @@ def find_local_links(text: str) -> list[str]:
 
 
 def check_dangling_links(kb_path: Path) -> list[str]:
-    """`archivo.md -> target roto` por cada link relativo del KB que no
-    resuelve a un archivo existente."""
+    """`file.md -> broken target` for every relative link in the KB that
+    doesn't resolve to an existing file."""
     broken = []
     for f in sorted(kb_path.rglob("*.md")):
         try:
@@ -90,21 +90,21 @@ def check_dangling_links(kb_path: Path) -> list[str]:
 
 
 def check_stale(entries: list[dict], max_age_days: int = 180) -> list[str]:
-    """Entradas sin `last_verified` o más viejas que max_age_days."""
+    """Entries without `last_verified` or older than max_age_days."""
     stale = []
-    # una staleness check de ~180 días no necesita tz-awareness: la hora
-    # local del día actual es más que suficiente precisión aquí.
+    # a ~180-day staleness check doesn't need tz-awareness: the current
+    # day's local time is more than enough precision here.
     cutoff = _dt.datetime.now().date() - _dt.timedelta(days=max_age_days)  # noqa: DTZ005
     for e in entries:
         raw = e.get("last_verified")
         if not raw:
-            stale.append(f"{e['path']}: sin last_verified")
+            stale.append(f"{e['path']}: no last_verified")
             continue
         try:
             d = _dt.date.fromisoformat(str(raw))
         except ValueError:
-            stale.append(f"{e['path']}: last_verified inválido ({raw})")
+            stale.append(f"{e['path']}: invalid last_verified ({raw})")
             continue
         if d < cutoff:
-            stale.append(f"{e['path']}: last_verified {raw} (> {max_age_days} días)")
+            stale.append(f"{e['path']}: last_verified {raw} (> {max_age_days} days)")
     return stale

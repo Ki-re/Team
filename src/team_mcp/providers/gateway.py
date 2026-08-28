@@ -1,4 +1,4 @@
-"""Cliente HTTP hacia el gateway LiteLLM (formato OpenAI /chat/completions)."""
+"""HTTP client for the LiteLLM gateway (OpenAI /chat/completions format)."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ class GatewayError(RuntimeError):
 
 
 class GatewayProvider:
-    """Habla con un tier lógico (tier-fast/coder/context/premium) vía LiteLLM.
+    """Talks to a logical tier (tier-fast/coder/context/premium) via LiteLLM.
 
-    LiteLLM ya resuelve el round-robin entre keys y los fallbacks en
-    cascada configurados en deploy/litellm.config.yaml; este cliente solo
-    necesita apuntar al model_name correcto.
+    LiteLLM already resolves round-robin between keys and the cascading
+    fallbacks configured in deploy/litellm.config.yaml; this client only
+    needs to point at the right model_name.
     """
 
     def __init__(self, config: Config, timeout: float = 120.0) -> None:
@@ -62,16 +62,16 @@ class GatewayProvider:
         tools: list[dict],
         temperature: float = 0.2,
     ) -> str:
-        """Llama a /v1/responses (Responses API), no /v1/chat/completions —
-        formato distinto, necesario para tool-use vía el MCP Gateway de
-        LiteLLM (Fase 7 del plan). Úsalo solo con tiers/modelos que de
-        verdad soporten tool-calling (hoy: tier-context); no se ha probado
-        con tier-fast/tier-coder.
+        """Calls /v1/responses (Responses API), not /v1/chat/completions —
+        a different format, needed for tool-use via LiteLLM's MCP Gateway
+        (plan Phase 7). Only use it with tiers/models that genuinely
+        support tool-calling (today: tier-context); untested with
+        tier-fast/tier-coder.
 
-        El parseo de la respuesta es best-effort sobre el formato Responses
-        API estándar (`output: [{type: "message", content: [{type:
-        "output_text", text: ...}]}]`) — revisar si LiteLLM lo expone
-        distinto al verificar en vivo.
+        Response parsing is best-effort over the standard Responses API
+        shape (`output: [{type: "message", content: [{type:
+        "output_text", text: ...}]}]`) — recheck if LiteLLM exposes it
+        differently when verifying live.
         """
         payload = {
             "model": tier,
@@ -90,14 +90,14 @@ class GatewayProvider:
                 continue
             for part in item.get("content", []):
                 if part.get("type") in ("output_text", "text"):
-                    # algunos backends del pool devuelven "text": null en
-                    # vez de omitir la clave (visto en vivo el 2026-08-24
-                    # contra tier-context) — .get(..., "") no basta porque
-                    # la clave SÍ existe, solo que vale None.
+                    # some backends in the pool return "text": null
+                    # instead of omitting the key (seen live on
+                    # 2026-08-24 against tier-context) — .get(..., "")
+                    # isn't enough because the key DOES exist, it's just None.
                     texts.append(part.get("text") or "")
         joined = "\n".join(texts).strip()
         if not joined:
-            raise GatewayError(f"{tier} (responses): sin output_text parseable en {str(data)[:500]}")
+            raise GatewayError(f"{tier} (responses): no parseable output_text in {str(data)[:500]}")
         return joined
 
     async def liveliness(self) -> bool:

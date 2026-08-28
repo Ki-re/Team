@@ -5,7 +5,7 @@
 <h1 align="center">Team</h1>
 
 <p align="center">
-  An MCP server that lets Claude delegate real implementation work to a farm of free/cheap LLMs.
+  An MCP server that lets a coding agent (Claude, Codex, Hermes, ...) delegate real implementation work to a farm of free/cheap LLMs.
 </p>
 
 <p align="center">
@@ -14,10 +14,15 @@
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue">
 </p>
 
-Claude (Desktop or Code) acts **only** as the orchestrator: it plans and
-delegates. All the actual implementation — writing code, analyzing logs,
-reviewing changes — runs on a farm of free or cheap models behind a
-self-hosted LiteLLM gateway, through this local MCP server.
+A coding agent acts **only** as the orchestrator: it plans and delegates.
+All the actual implementation — writing code, analyzing logs, reviewing
+changes — runs on a farm of free or cheap models behind a self-hosted
+LiteLLM gateway, through this local MCP server. Claude (Desktop or Code)
+is the tested, documented orchestrator (see [Register the MCP
+server](#4-register-the-mcp-server-with-claude-code) below), but nothing
+about the design is Claude-specific: any agent that can speak MCP —
+Codex, Hermes, or anything else with its own registration step — plans
+and delegates the exact same way.
 
 The interesting part isn't "connect some cheap models" — small models
 produce mediocre code on their own. The value is in the *process* wrapped
@@ -27,6 +32,67 @@ from the pipeline, not from any single model.
 
 See [CHANGELOG.md](CHANGELOG.md) for the version history.
 
+## Why LiteLLM
+
+The MCP server never talks to a specific provider's SDK directly — it only
+ever speaks one API shape (OpenAI-compatible `/v1/chat/completions`) to
+one local endpoint, the LiteLLM gateway. LiteLLM's job is to sit between
+that one endpoint and however many real providers/models you actually
+want behind it, each registered under one of the four logical tier names
+(`tier-fast`, `tier-coder`, `tier-context`, `tier-premium`).
+
+That indirection is what makes running on free or very cheap models
+practical instead of a maintenance burden:
+
+- **Swapping or adding a model is a config change, not a code change.**
+  Every tier in [deploy/litellm.config.yaml](deploy/litellm.config.yaml)
+  can hold several entries from different providers and families — round-
+  robin between free-tier API keys, cascading fallbacks when one is
+  exhausted or degraded, and diversity that the cross-validation consensus
+  matrix in [`engine/consensus.py`](src/team_mcp/engine/consensus.py)
+  actively benefits from (two correlated models producing the same wrong
+  answer is worse than two independent models disagreeing).
+- **Strong, freely-usable coder models exist today** — DeepSeek, Qwen
+  Coder, GLM, and others regularly show up with $0 pricing on OpenRouter's
+  catalog (subject to change, see the table and disclaimer below); this
+  project's own `tier-coder` pool has run on exactly that kind of model.
+  Nothing stops you from pointing a tier at a paid model instead if you'd
+  rather trade quota headroom for money.
+- **Self-hosted models plug into the same four tiers, with no code
+  changes.** LiteLLM talks to self-hosted, OpenAI-compatible endpoints
+  (vLLM, Ollama, LM Studio, text-generation-webui, and similar) the same
+  way it talks to a cloud provider — just another `model_list` entry
+  pointing at your own URL instead of a hosted API. That means the farm
+  scales horizontally in a very literal sense: add a GPU box running vLLM
+  with a large open-weight model, register it under `tier-coder`, and it
+  participates in the fan-out and consensus matrix exactly like any other
+  worker, free-tier or not.
+
+### Providers with free-tier models (the ones this project uses)
+
+These are the providers actually wired up in
+[deploy/litellm.config.yaml](deploy/litellm.config.yaml) and
+[deploy/.env.example](deploy/.env.example) today — not an exhaustive
+market survey, just what's verified working in this setup.
+
+| Provider | Used for | What's free | Notes |
+|---|---|---|---|
+| [Groq](https://console.groq.com) | `tier-fast` | Generous free-tier rate limits on hosted open-weight models (e.g. `gpt-oss-20b`, Qwen) | Very low latency; good fit for small, atomic tasks. |
+| [OpenRouter](https://openrouter.ai) | `tier-coder`, `tier-context` | A large, changing catalog of `:free`-suffixed models (DeepSeek, Qwen Coder, GLM, and others come and go) — including `openrouter/openrouter/free`, OpenRouter's own router that spreads calls across its free catalog at random | Check [openrouter.ai/models](https://openrouter.ai/models?max_price=0) for what's currently free — this list is the most volatile of the four. |
+| [Google AI Studio](https://aistudio.google.com) (Gemini API) | `tier-context`, `tier-premium` fallback | Free-tier quota on Flash-class Gemini models, with large context windows | Pro-class models often show 0 quota on a fresh key even though they're listed — that's usually a billing/entitlement gap, not a broken model name. |
+| [Mistral](https://console.mistral.ai) (La Plateforme) | `tier-coder` | A free "Experiment" tier with rate-limited access to models like Codestral, intended for evaluation/non-commercial use | Read Mistral's current terms before relying on this for anything beyond experimentation. |
+
+### Disclaimer
+
+Free tiers, rate limits, and pricing change often and without notice —
+providers rename, retire, or start charging for models regularly. The
+table above reflects what worked while this project was built and is not
+a guarantee of current availability, pricing, or terms of service for any
+provider. Verify a model's actual status directly against the provider
+before depending on it, and read each provider's terms yourself,
+especially around commercial use — nothing here is legal or financial
+advice about what a given free tier allows.
+
 ## Architecture
 
 Hand-authored SVG diagrams (not Mermaid — it didn't render consistently
@@ -35,9 +101,9 @@ everywhere). Diagrams for the other workflows (`team_task`, `team_epic`,
 [docs/DIAGRAMS.md](docs/DIAGRAMS.md).
 
 ### Components
-How the pieces fit together: Claude only orchestrates, `team-mcp` talks to
-the gateway and to an optional coding-agent CLI, and every write goes
-through a sandbox.
+How the pieces fit together: the orchestrating agent only orchestrates,
+`team-mcp` talks to the gateway and to an optional subscription
+coding-agent CLI, and every write goes through a sandbox.
 
 <img src="docs/diagrams/architecture.svg" alt="Diagram of Team's components" width="900">
 
@@ -48,11 +114,50 @@ to the premium tier as a last resort — the project's main unit of work.
 
 <img src="docs/diagrams/team_feature_pipeline.svg" alt="team_feature pipeline" width="720">
 
+## The premium tier: why `agy`, and how to swap it
+
+`tier-premium` (adversarial critique, last-resort repair) is invoked two
+ways: through the LiteLLM gateway like any other tier (a plain API
+fallback), or — the default, preferred path — via a subprocess call to a
+**subscription-based coding-agent CLI**, `agy` (Antigravity CLI) out of
+the box. The reasoning is entitlement, not capability: a paid coding-agent
+subscription is a flat monthly plan, not metered per-token billing, so it
+usually has far more real headroom than a shared free-tier API key. It
+makes sense to spend that specific capacity on the hardest calls — final
+critique, the repair attempt that's already failed a few times — instead
+of burning shared free-tier quota on them.
+
+`agy` is a reference implementation, not a requirement. `providers/agy.py`
+is a thin, swappable subprocess wrapper: to use a different subscription
+CLI — Codex CLI, Claude Code's own `claude -p`, Hermes, or anything else
+that takes a prompt on argv and prints a plain-text answer — you don't
+need to fork any code in most cases. Two environment variables in `.env`
+are enough:
+
+```bash
+TEAM_AGY_PATH=/path/to/that/clis/binary
+# "{prompt}" is substituted as ONE argv element — never interpolated into
+# a shell string, so quotes/newlines in the prompt need no escaping.
+TEAM_AGY_CLI_ARGS="exec|{prompt}"              # e.g. Codex CLI
+TEAM_AGY_CLI_ARGS="-p|{prompt}|--output-format|text"   # e.g. claude -p
+```
+
+Leave `TEAM_AGY_CLI_ARGS` unset to keep `agy`'s own invocation (the
+default). If your CLI's output needs real parsing (JSON, a login
+handshake, stdin piping) rather than "print text to stdout," that's the
+one case that does need a small fork of `providers/agy.py` — the module's
+docstring walks through exactly what to change. If you don't want a
+subscription CLI in the loop at all, leave `TEAM_AGY_PATH` empty and the
+premium tier falls back to the API entries in
+`deploy/litellm.config.yaml` automatically — including, per the [Why
+LiteLLM](#why-litellm) section above, a self-hosted model if you'd rather
+not depend on any external provider for the premium tier either.
+
 ## The five tools
 
-Claude only ever sees five entry points, graded by task complexity — each
-one is a complete pipeline that returns a compact manifest, never
-intermediate results or raw generated code:
+The orchestrating agent only ever sees five entry points, graded by task
+complexity — each one is a complete pipeline that returns a compact
+manifest, never intermediate results or raw generated code:
 
 | Tool | Use it for | Notes |
 |---|---|---|
@@ -77,7 +182,7 @@ that the change made stale. It never invents new entries on its own.
 - Python 3.11+
 - Docker + Docker Compose, on whatever host will run the gateway (your own
   machine, a small VPS, a home server — anything reachable from where
-  Claude runs)
+  your coding agent runs)
 - API keys for at least a couple of free-tier providers (e.g.
   [Groq](https://console.groq.com), [OpenRouter](https://openrouter.ai))
 - [Claude Code](https://claude.com/claude-code) or Claude Desktop
@@ -169,8 +274,13 @@ just whether the gateway process is up.
 
 ## Set up with an AI coding agent
 
-If you're already working inside Claude Code (or another coding agent),
-you can hand it the whole setup instead of doing it by hand. Paste this:
+If you're already working inside Claude Code (or another coding agent
+capable of running shell commands and editing files), you can hand it the
+whole setup instead of doing it by hand. Paste this — step 4 below uses
+`claude mcp add`, the concrete, tested registration path for Claude Code;
+if your agent is something else (Codex CLI, Hermes, etc.), swap that one
+line for whatever your agent's own MCP-registration command is, the rest
+of the setup is agent-agnostic:
 
 ```text
 Set up the "team" MCP server for me from https://github.com/Ki-re/Team:

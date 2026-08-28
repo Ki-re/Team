@@ -1,8 +1,8 @@
-"""Contadores de tokens por tier/workflow, techo duro, telemetría en SQLite.
+"""Token counters per tier/workflow, hard cap, telemetry in SQLite.
 
-Existe para dos cosas: (1) que team_epic pueda parar limpiamente cuando se
-agota el presupuesto, incluyendo el gasto de las auto-escaladas task->feature,
-y (2) alimentar a `selftest` con datos reales de coste/latencia por modelo.
+Exists for two things: (1) so team_epic can stop cleanly when the budget
+runs out, including the spend from task->feature auto-escalations, and
+(2) feeding `selftest` real cost/latency data per model.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_spend_model ON spend(model);
 
 class BudgetExceeded(RuntimeError):
     def __init__(self, spent: int, budget: int) -> None:
-        super().__init__(f"presupuesto agotado: {spent}/{budget} tokens")
+        super().__init__(f"budget exhausted: {spent}/{budget} tokens")
         self.spent = spent
         self.budget = budget
 

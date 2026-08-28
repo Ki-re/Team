@@ -1,10 +1,10 @@
-"""Fixtures compartidos para la suite de tests unitarios de team-mcp.
+"""Shared fixtures for team-mcp's unit test suite.
 
-Todo lo que hay aquí es lógica determinista/local — nada llama al gateway
-real. Los caminos con modelos en vivo (fan-out, crítica, map-reduce) se
-verifican manualmente contra el gateway real durante el desarrollo, no en
-esta suite (ver el plan, Fase 9 — mockear httpx o gastar cuota real en
-cada corrida de tests sería el trade-off equivocado para este proyecto).
+Everything here is deterministic/local logic — nothing calls the real
+gateway. Code paths that call live models (fan-out, critique, map-reduce)
+are verified manually against the real gateway during development, not in
+this suite (mocking httpx or spending real quota on every test run would
+be the wrong trade-off for this project).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ def make_config(tmp_path: Path):
             gateway_key="test-key",
             agy_path=None,
             agy_model=None,
+            agy_cli_args=None,
             sandbox_roots=sandbox_roots if sandbox_roots is not None else [tmp_path],
             dry_run=dry_run,
             token_budget_default=200_000,

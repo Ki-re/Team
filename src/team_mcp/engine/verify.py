@@ -1,8 +1,8 @@
-"""Verificación determinista: siempre antes de gastar tokens en juzgar código.
+"""Deterministic verification: always before spending tokens judging code.
 
-Un candidato que no parsea o no lint-a se descarta gratis, sin involucrar a
-ningún modelo. Esto es lo primero que corre sobre cada CandidateSolution del
-fan-out de tier-coder.
+A candidate that doesn't parse or doesn't lint gets discarded for free,
+without involving any model. This is the first thing that runs on every
+CandidateSolution from the tier-coder fan-out.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ class VerifyTarget:
     candidate_id: str
     workdir: Path
     py_files: list[str]
-    test_command: list[str] | None = None  # ej. ["pytest", "-q"]
+    test_command: list[str] | None = None  # e.g. ["pytest", "-q"]
     timeout_s: float = 60.0
 
 
@@ -41,11 +41,11 @@ def _parses(py_files: list[str], workdir: Path) -> tuple[bool, str]:
 def _lint(workdir: Path, timeout_s: float) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
-            [sys.executable, "-m", "ruff", "check", "."],  # nunca depender de "ruff" en el PATH
+            [sys.executable, "-m", "ruff", "check", "."],  # never depend on "ruff" being on PATH
             cwd=workdir, capture_output=True, text=True, timeout=timeout_s, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        return True, f"ruff no disponible/timeout, se omite: {exc}"
+        return True, f"ruff unavailable/timeout, skipped: {exc}"
     return proc.returncode == 0, proc.stdout[-2000:]
 
 
@@ -82,7 +82,7 @@ def _run_tests(cmd: list[str], workdir: Path, timeout_s: float) -> tuple[int, in
             cmd, cwd=workdir, capture_output=True, text=True, timeout=timeout_s, check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        return 0, 0, f"timeout tras {timeout_s}s: {exc}"
+        return 0, 0, f"timeout after {timeout_s}s: {exc}"
 
     output = proc.stdout + proc.stderr
     run, passed = _parse_pytest_summary(output)
@@ -90,7 +90,7 @@ def _run_tests(cmd: list[str], workdir: Path, timeout_s: float) -> tuple[int, in
 
 
 def _parse_pytest_summary(output: str) -> tuple[int, int]:
-    """Extrae contadores de la línea final de pytest (best-effort)."""
+    """Extracts counters from pytest's final summary line (best-effort)."""
     import re
 
     passed = len(re.findall(r"(?m)^PASSED", output)) or 0

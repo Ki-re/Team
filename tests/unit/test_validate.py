@@ -72,7 +72,7 @@ def test_check_secrets_clean_file_passes(tmp_path: Path):
 
 
 def test_check_secrets_short_password_value_not_flagged(tmp_path: Path):
-    # el patrón exige >=8 caracteres para evitar falsos positivos triviales
+    # the pattern requires >=8 characters to avoid trivial false positives
     f = tmp_path / "cfg.py"
     f.write_text('password = "abc"\n')
     ok, _ = _check_secrets([f])
@@ -81,22 +81,22 @@ def test_check_secrets_short_password_value_not_flagged(tmp_path: Path):
 
 def test_check_kb_frontmatter_ignores_index_and_files_without_frontmatter(tmp_path: Path):
     (tmp_path / "INDEX.md").write_text("- [a](a.md) — desc\n")
-    (tmp_path / "sin_frontmatter.md").write_text("solo texto\n")
+    (tmp_path / "no_frontmatter.md").write_text("just text\n")
     ok, detail = _check_kb_frontmatter(tmp_path)
     assert ok is True
     assert detail == ""
 
 
 def test_check_kb_frontmatter_passes_valid_frontmatter(tmp_path: Path):
-    (tmp_path / "a.md").write_text("---\nname: a\ndescription: x\n---\ncontenido\n")
+    (tmp_path / "a.md").write_text("---\nname: a\ndescription: x\n---\ncontent\n")
     ok, detail = _check_kb_frontmatter(tmp_path)
     assert ok is True
     assert detail == ""
 
 
 def test_check_kb_frontmatter_flags_broken_frontmatter(tmp_path: Path):
-    f = tmp_path / "roto.md"
-    f.write_text("---\nname: [sin cerrar\n---\ncontenido\n")
+    f = tmp_path / "broken.md"
+    f.write_text("---\nname: [unclosed\n---\ncontent\n")
     ok, detail = _check_kb_frontmatter(tmp_path)
     assert ok is False
-    assert "roto.md" in detail
+    assert "broken.md" in detail

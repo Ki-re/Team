@@ -1,9 +1,9 @@
-"""Contratos estructurados entre etapas del pipeline.
+"""Structured contracts between pipeline stages.
 
-Todo lo que un worker devuelve se valida contra uno de estos modelos antes
-de pasar a la siguiente etapa. Los modelos pequeños producen JSON roto con
-frecuencia: la cadena de rescate (parse -> reparación con tier-fast -> fallo
-duro) vive en engine/repair.py y usa estos esquemas como objetivo.
+Everything a worker returns is validated against one of these models
+before moving to the next stage. Small models produce broken JSON
+frequently: the rescue chain (parse -> repair with tier-fast -> hard
+failure) lives in engine/repair.py and uses these schemas as its target.
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ class FeatureKind(str, Enum):
 
 
 class FileEdit(BaseModel):
-    """Bloque search/replace estricto. Se valida por coincidencia EXACTA de
-    `search` en el archivo antes de aplicar `replace`; nunca se sobrescribe
-    el archivo entero."""
+    """Strict search/replace block. Validated by an EXACT match of
+    `search` in the file before applying `replace`; the whole file is
+    never overwritten."""
 
     path: str
     search: str
@@ -38,7 +38,7 @@ class FileEdit(BaseModel):
 
 
 class CandidateSolution(BaseModel):
-    """Salida de un worker de tier-coder en el fan-out inicial."""
+    """Output of a tier-coder worker in the initial fan-out."""
 
     worker_id: str
     model: str
@@ -48,7 +48,7 @@ class CandidateSolution(BaseModel):
 
 
 class VerificationResult(BaseModel):
-    """Resultado determinista de verify.py — nunca lo produce un modelo."""
+    """Deterministic result from verify.py — never produced by a model."""
 
     candidate_id: str
     parses: bool
@@ -59,10 +59,10 @@ class VerificationResult(BaseModel):
 
     @property
     def passes_gate(self) -> bool:
-        # solo "parsea" es el gate duro y gratuito, tal como dice el plan.
-        # lint_ok queda como señal informativa: un ruff nit cosmético
-        # (orden de imports, línea en blanco) no debe rechazar código
-        # correcto — visto fallar así en pruebas reales de kind=refactor.
+        # only "parses" is the hard, free gate, as the plan says. lint_ok
+        # stays as an informational signal: a cosmetic ruff nit (import
+        # order, blank line) shouldn't reject correct code — seen failing
+        # exactly this way in real kind=refactor tests.
         return self.parses
 
 
@@ -77,8 +77,8 @@ class ConsensusResult(BaseModel):
     winner_id: str | None
     scores: dict[str, float]
     matrix: list[CrossMatrixCell]
-    discarded_tests: list[str] = Field(default_factory=list)  # tests que nadie pasa
-    trivial_tests: list[str] = Field(default_factory=list)    # tests que todos pasan
+    discarded_tests: list[str] = Field(default_factory=list)  # tests nobody passes
+    trivial_tests: list[str] = Field(default_factory=list)    # tests everyone passes
     escalate_to_premium: bool = False
 
 
@@ -87,7 +87,7 @@ class CriticFinding(BaseModel):
     file: str
     line: int | None = None
     claim: str
-    failure_scenario: str  # obligatorio: sin esto, el hallazgo se descarta
+    failure_scenario: str  # required: without this, the finding is discarded
     suggested_fix: str = ""
 
 
@@ -107,7 +107,8 @@ class RepairAttempt(BaseModel):
 
 
 class Manifest(BaseModel):
-    """Lo único que Claude ve al final de un pipeline. Compacto a propósito."""
+    """The only thing the orchestrating agent sees at the end of a
+    pipeline. Deliberately compact."""
 
     tool: str
     kind: FeatureKind | None = None
@@ -116,6 +117,6 @@ class Manifest(BaseModel):
     tests_status: str = "unknown"  # "green" | "red" | "not_run"
     critic_findings_open: int = 0
     tokens_used: dict[str, int] = Field(default_factory=dict)
-    provider_used: dict[str, str] = Field(default_factory=dict)  # ej. tier_premium -> "agy"|"fallback"
+    provider_used: dict[str, str] = Field(default_factory=dict)  # e.g. tier_premium -> "agy"|"fallback"
     summary: str = ""
     dry_run: bool = False

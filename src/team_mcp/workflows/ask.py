@@ -1,14 +1,14 @@
-"""team_ask: preguntas sobre código/logs, sin escribir nada.
+"""team_ask: questions about code/logs, without writing anything.
 
-Map-reduce real sobre tier-context (primitiva de la Capa 2 del plan):
-  1. map: cada archivo se trocea y cada fragmento se pregunta en paralelo
-     ("¿qué hay aquí relevante para la pregunta, con cita ruta:línea?").
-  2. reduce: los extractos relevantes se sintetizan en una respuesta.
-  3. verificación de citas: cada `ruta:línea` que aparece en la respuesta
-     final se comprueba estructuralmente (el archivo existe en el scope, la
-     línea está dentro de rango). Las que no se pueden verificar se marcan
-     `[no verificado]` in-line — anti-alucinación determinista, no depende
-     de que ningún modelo se autoevalúe.
+Real map-reduce over tier-context (a Layer 2 primitive of the plan):
+  1. map: each file is chunked and each fragment is asked in parallel
+     ("what's here relevant to the question, with a path:line citation?").
+  2. reduce: the relevant excerpts are synthesized into one answer.
+  3. citation verification: every `path:line` that appears in the final
+     answer is checked structurally (the file exists in scope, the line
+     is in range). Ones that can't be verified are marked
+     `[unverified]` in-line — deterministic anti-hallucination, doesn't
+     depend on any model grading itself.
 """
 
 from __future__ import annotations
@@ -24,49 +24,49 @@ from team_mcp.providers.router import Router
 
 _WORKFLOW = "team_ask"
 _CHUNK_CHARS = 12_000
-_MAX_CHUNKS = 12  # tope de llamadas paralelas por pregunta
+_MAX_CHUNKS = 12  # cap on parallel calls per question
 _SCAN_EXTENSIONS = {
     ".py", ".ts", ".tsx", ".js", ".jsx", ".md", ".yaml", ".yml", ".json", ".txt", ".log", ".toml",
 }
 _CITATION_RE = re.compile(r"([\w./\\-]+\.\w+):(\d+)")
 
 _MAP_PROMPT = """\
-Estás leyendo UN fragmento de un archivo más grande, como parte de una
-búsqueda distribuida para responder una pregunta. Extrae SOLO los hechos de
-este fragmento relevantes para la pregunta, cada uno con su cita exacta en
-formato `{path}:<línea>`. Si nada de este fragmento es relevante, responde
-ÚNICAMENTE la palabra NADA_RELEVANTE.
+You're reading ONE fragment of a larger file, as part of a distributed
+search to answer a question. Extract ONLY the facts from this fragment
+relevant to the question, each with its exact citation in the format
+`{path}:<line>`. If nothing in this fragment is relevant, respond with
+ONLY the word NOTHING_RELEVANT.
 
-Archivo: {path}
-Pregunta: {question}
+File: {path}
+Question: {question}
 
-Fragmento (la primera línea de abajo es la línea {start_line} del archivo):
+Fragment (the first line below is line {start_line} of the file):
 {content}
 """
 
 _REDUCE_PROMPT = """\
-Estos son extractos relevantes de varios archivos/fragmentos, cada uno ya
-con sus citas `ruta:línea`. Sintetiza una respuesta concisa a la pregunta,
-preservando las citas que uses tal cual aparecen abajo. No inventes citas
-que no estén en los extractos.
+These are relevant excerpts from several files/fragments, each already
+with its `path:line` citations. Synthesize a concise answer to the
+question, preserving the citations you use exactly as they appear below.
+Don't invent citations that aren't in the excerpts.
 
-Pregunta: {question}
+Question: {question}
 
-Extractos:
+Excerpts:
 {digests}
 """
 
 _WEB_AUGMENT_PROMPT = """\
-Respuesta basada en el código/archivos locales (puede estar vacía si no
-había nada relevante):
+Answer based on the local code/files (may be empty if nothing was
+relevant):
 {local_answer}
 
-Pregunta original: {question}
+Original question: {question}
 
-Usa la tool de búsqueda web SOLO para completar lo que el contexto local no
-cubre (versiones actuales, documentación externa, algo fuera del repo). No
-la uses si la respuesta local ya es completa. Cita las fuentes web que uses
-con su URL.
+Use the web search tool ONLY to fill in what the local context doesn't
+cover (current versions, external documentation, something outside the
+repo). Don't use it if the local answer is already complete. Cite the web
+sources you use with their URL.
 """
 
 
@@ -82,7 +82,7 @@ def _collect_files(scope_paths: list[str]) -> list[Path]:
 
 
 def _chunk_file(path: Path) -> tuple[list[tuple[int, str]], int]:
-    """Devuelve ([(línea_inicio, texto_fragmento), ...], total_líneas)."""
+    """Returns ([(start_line, fragment_text), ...], total_lines)."""
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -112,11 +112,11 @@ async def _map_chunk(router: Router, path: str, start_line: int, content: str, q
     prompt = _MAP_PROMPT.format(path=path, question=question, start_line=start_line, content=content)
     try:
         result = await router.context(_WORKFLOW, prompt, temperature=0.1)
-    except Exception:  # noqa: BLE001 — un fragmento caído no debe tumbar la búsqueda
+    except Exception:  # noqa: BLE001 — one downed fragment shouldn't sink the whole search
         return None
-    if len(result) < 60 and "NADA_RELEVANTE" in result.upper():
+    if len(result) < 60 and "NOTHING_RELEVANT" in result.upper():
         return None
-    return f"[{path} desde línea {start_line}]\n{result}"
+    return f"[{path} from line {start_line}]\n{result}"
 
 
 def _verify_citations(answer: str, line_counts: dict[str, int]) -> tuple[str, int, int]:
@@ -130,7 +130,7 @@ def _verify_citations(answer: str, line_counts: dict[str, int]) -> tuple[str, in
         max_line = line_counts.get(path) or line_counts.get(Path(path).name)
         if max_line is None or not (1 <= line <= max_line):
             unverified += 1
-            return f"{m.group(0)} [no verificado]"
+            return f"{m.group(0)} [unverified]"
         return m.group(0)
 
     annotated = _CITATION_RE.sub(_check, answer)
@@ -146,12 +146,12 @@ async def run(
     scope_paths: list[str],
     allow_web_search: bool = False,
 ) -> Manifest:
-    """allow_web_search (Fase 7 del plan): cuando Claude sabe que la
-    pregunta necesita contexto externo (versión de una librería, docs de
-    una API externa), pasa a usar la tool `web_search` del MCP Gateway de
-    LiteLLM (solo tier-context, solo desde team_ask — ver
-    providers/router.py::context_with_tools). Nunca automático: si no se
-    pide, el comportamiento es exactamente el de antes."""
+    """allow_web_search (plan Phase 7): when Claude knows the question
+    needs external context (a library version, docs for an external API),
+    it switches to using LiteLLM's MCP Gateway `web_search` tool
+    (tier-context only, only from team_ask — see
+    providers/router.py::context_with_tools). Never automatic: if it's
+    not requested, behavior is exactly as before."""
     files = _collect_files(scope_paths)
     digests: list[str] = []
     line_counts: dict[str, int] = {}
@@ -176,8 +176,8 @@ async def run(
 
     if not digests and not allow_web_search:
         summary = (
-            f"ningún archivo encontrado en scope_paths={scope_paths}" if not files
-            else "ningún fragmento del scope resultó relevante para la pregunta"
+            f"no file found in scope_paths={scope_paths}" if not files
+            else "no fragment in scope turned out relevant to the question"
         )
         return Manifest(tool=_WORKFLOW, tests_status="not_run", summary=summary, dry_run=config.dry_run)
 
@@ -188,26 +188,26 @@ async def run(
 
     if allow_web_search:
         web_prompt = _WEB_AUGMENT_PROMPT.format(
-            question=question, local_answer=answer or "(sin contexto local relevante)",
+            question=question, local_answer=answer or "(no relevant local context)",
         )
         try:
             answer = await router.context_with_tools(_WORKFLOW, web_prompt)
-        except Exception as exc:  # noqa: BLE001 — la búsqueda web es un complemento, no debe tumbar una respuesta local que sí funcionó
+        except Exception as exc:  # noqa: BLE001 — web search is a complement, it shouldn't sink a local answer that DID work
             if not answer:
                 return Manifest(
                     tool=_WORKFLOW, tests_status="not_run",
-                    summary=f"búsqueda web falló y no había contexto local: {exc}",
+                    summary=f"web search failed and there was no local context: {exc}",
                     dry_run=config.dry_run,
                 )
-            answer += f"\n\n[búsqueda web no disponible: {exc}]"
+            answer += f"\n\n[web search unavailable: {exc}]"
 
     annotated, total_citations, unverified = _verify_citations(answer, line_counts)
 
     summary = annotated[:4000]
     if total_citations:
-        summary += f"\n\n[{total_citations - unverified}/{total_citations} citas verificadas estructuralmente]"
+        summary += f"\n\n[{total_citations - unverified}/{total_citations} citations structurally verified]"
     if truncated:
-        summary += f"\n[scope truncado a los primeros {_MAX_CHUNKS} fragmentos de {len(files)} archivos]"
+        summary += f"\n[scope truncated to the first {_MAX_CHUNKS} fragments out of {len(files)} files]"
 
     return Manifest(
         tool=_WORKFLOW, tests_status="not_run",

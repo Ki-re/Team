@@ -1,8 +1,8 @@
-"""Jaula de rutas para toda escritura en disco del MCP.
+"""Path cage for every on-disk write the MCP server performs.
 
-Regla dura del proyecto: la escritura es la parte peligrosa. Nada se toca
-fuera de TEAM_SANDBOX_ROOTS, y todo pasa por dry_run/snapshot antes de
-aplicarse de verdad.
+Hard rule of the project: writing is the dangerous part. Nothing is
+touched outside TEAM_SANDBOX_ROOTS, and everything goes through
+dry_run/snapshot before it's actually applied.
 """
 
 from __future__ import annotations
@@ -20,13 +20,13 @@ class SandboxViolation(RuntimeError):
 
 
 class EditConflict(RuntimeError):
-    """El bloque `search` no coincide exactamente con el contenido actual."""
+    """The `search` block doesn't match the current content exactly."""
 
 
 @dataclass
 class Snapshot:
     id: str
-    files: dict[Path, str | None]  # None = el archivo no existía antes
+    files: dict[Path, str | None]  # None = the file didn't exist before
 
 
 class Sandbox:
@@ -38,10 +38,10 @@ class Sandbox:
         resolved = path.resolve()
         if not self._roots:
             raise SandboxViolation(
-                "TEAM_SANDBOX_ROOTS vacío: no hay rutas permitidas para escritura"
+                "TEAM_SANDBOX_ROOTS is empty: no paths allowed for writing"
             )
         if not any(resolved == r or r in resolved.parents for r in self._roots):
-            raise SandboxViolation(f"ruta fuera de la whitelist: {resolved}")
+            raise SandboxViolation(f"path outside the whitelist: {resolved}")
         return resolved
 
     def snapshot(self, paths: list[str]) -> Snapshot:
@@ -59,9 +59,9 @@ class Sandbox:
                 p.write_text(content, encoding="utf-8")
 
     def apply_edits(self, edits: list[FileEdit]) -> list[str]:
-        """Aplica bloques search/replace tras validar coincidencia exacta.
+        """Applies search/replace blocks after validating an exact match.
 
-        Todo o nada: si un solo edit no encaja, no se escribe ninguno.
+        All or nothing: if a single edit doesn't fit, none get written.
         """
         targets = [self._check_path(Path(e.path)) for e in edits]
         snap = self.snapshot([str(t) for t in targets])
@@ -83,9 +83,10 @@ class Sandbox:
         _apply_edit_unchecked(target, edit)
 
     def materialize_edits(self, edits: list[FileEdit], into: Path) -> None:
-        """Aplica `edits` directamente sobre `into` (ya asumido seguro/scratch,
-        sin pasar por la whitelist). Usado por consensus.py para construir
-        cada celda de la matriz cruzada sin tocar el sandbox real."""
+        """Applies `edits` directly onto `into` (already assumed to be a
+        safe scratch dir, bypassing the whitelist). Used by consensus.py
+        to build each cell of the cross matrix without touching the real
+        sandbox."""
         for edit in edits:
             target = into / edit.path
             _apply_edit_unchecked(target, edit)
@@ -93,18 +94,18 @@ class Sandbox:
 
 def _apply_edit_unchecked(target: Path, edit: FileEdit) -> None:
     if edit.search == "":
-        # archivo nuevo
+        # new file
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(edit.replace, encoding="utf-8")
         return
 
     if not target.exists():
-        raise EditConflict(f"{target}: no existe y el edit no es de archivo nuevo")
+        raise EditConflict(f"{target}: doesn't exist and the edit isn't for a new file")
 
     current = target.read_text(encoding="utf-8")
     if current.count(edit.search) != 1:
         raise EditConflict(
-            f"{target}: el bloque `search` no aparece exactamente una vez "
-            f"(apariciones={current.count(edit.search)})"
+            f"{target}: the `search` block doesn't appear exactly once "
+            f"(occurrences={current.count(edit.search)})"
         )
     target.write_text(current.replace(edit.search, edit.replace, 1), encoding="utf-8")

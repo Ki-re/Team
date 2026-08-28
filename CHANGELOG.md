@@ -1,211 +1,211 @@
 # Changelog
 
-Todos los cambios notables de este proyecto se documentan aquí. El formato
-sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y el proyecto
-usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
+All notable changes to this project are documented here. The format
+follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
+project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
 ### Changed
-- `.github/workflows/tests.yml`: CI corre ahora `ruff check` y `mypy`
-  además de `pytest` — la razón de fondo por la que ambos llevaban toda la
-  sesión sin pasar de verdad (ver más abajo) es que nada los hacía
-  obligatorios en cada push.
+- `.github/workflows/tests.yml`: CI now runs `ruff check` and `mypy` in
+  addition to `pytest` — the underlying reason both had gone the whole
+  session without genuinely passing (see below) is that nothing made them
+  mandatory on every push.
 
 ### Fixed
-- **Auditoría autónoma del trabajo de esta sesión** (a petición explícita:
+- **Autonomous audit of this session's work** (per explicit request:
   "check your previous work for mistakes... fix them, don't wait for my
-  order"). `mypy` no se había corrido nunca en serio pese a estar en las
-  dev deps: 19 errores reales, todos corregidos — la mayoría eran
-  `extract_json()` (devuelve `dict | list`) usado como si siempre fuera
-  `dict` sin narrowing; se añadió `extract_json_dict()` (falla con un
-  `JsonExtractionError` claro si el modelo devuelve una lista donde se
-  esperaba un objeto, en vez del `TypeError` críptico de antes) y se migró
-  cada sitio que asumía `dict`. El resto eran variables reutilizadas con
-  tipos distintos dentro del mismo scope de función (`report`, `winner`,
-  `c`) — inofensivo en tiempo de ejecución pero frágil; renombradas.
-  `ruff check` tampoco estaba limpio (noqa obsoletos, imports desordenados)
-  — arreglado también, `ruff`/`mypy`/pytest quedan en verde a la vez.
-- **Bug real encontrado verificando en vivo tras el cambio de mypy** (no
-  causado por él): `engine/repair.py::_parse_repair_edits` y varios sitios
-  de `workflows/feature.py` construían `FileEdit(path=...)` directamente
-  del campo `path` que devuelve el modelo, sin normalizar — un worker de
-  `kind=fix` copió una ruta con subcarpeta del `repro_command` (que sí la
-  mencionaba) en vez de usar el basename plano que espera el "espacio de
-  basename" interno del pipeline, y la llamada entera reventó con
-  `EditConflict: ...no existe...` sin manifiesto, la misma clase de fallo
-  ya cerrada para consensus.py en la Fase 14. Añadido `_force_basename()`
-  (en `feature.py` y `repair.py`) que fuerza el basename en el límite
-  donde el output del modelo entra al espacio interno, más una instrucción
-  explícita "sin carpetas" en los prompts de `fix`/`refactor`/reparación
-  que no la tenían (`_IMPLEMENT_PROMPT` sí, desde el principio). Reproducido
-  y verificado en vivo dos veces: el escenario que reventaba ahora falla
-  limpio con un manifiesto claro (cuando el `repro_command` referencia una
-  ruta que no existe en el scratch dir aplanado — limitación real y
-  todavía no resuelta, documentada en el código, ver más abajo) y el
-  escenario equivalente con un `repro_command` de basename plano corrige
-  el bug correctamente de principio a fin.
+  order"). `mypy` had never actually been run in earnest despite being in
+  the dev deps: 19 real errors, all fixed — most were `extract_json()`
+  (returns `dict | list`) used as if it were always `dict` with no
+  narrowing; added `extract_json_dict()` (fails with a clear
+  `JsonExtractionError` if the model returns a list where an object was
+  expected, instead of the previous cryptic `TypeError`) and migrated
+  every site that assumed `dict`. The rest were variables reused with
+  different types within the same function scope (`report`, `winner`,
+  `c`) — harmless at runtime but fragile; renamed.
+  `ruff check` wasn't clean either (stale noqa comments, unsorted
+  imports) — fixed too, `ruff`/`mypy`/pytest are all green at once now.
+- **Real bug found verifying live after the mypy change** (not caused by
+  it): `engine/repair.py::_parse_repair_edits` and several spots in
+  `workflows/feature.py` built `FileEdit(path=...)` directly from the
+  `path` field the model returns, without normalizing it — a `kind=fix`
+  worker copied a path with a subfolder from the `repro_command` (which
+  did mention it) instead of using the flat basename the pipeline's
+  internal "basename space" expects, and the whole call crashed with
+  `EditConflict: ...doesn't exist...` with no manifest, the same class of
+  failure already closed for consensus.py in Phase 14. Added
+  `_force_basename()` (in `feature.py` and `repair.py`) which forces the
+  basename at the boundary where the model's output enters the internal
+  space, plus an explicit "no folders" instruction in the `fix`/
+  `refactor`/repair prompts that lacked it (`_IMPLEMENT_PROMPT` already
+  had it, from the start). Reproduced and verified live twice: the
+  scenario that used to crash now fails cleanly with a clear manifest
+  (when the `repro_command` references a path that doesn't exist in the
+  flattened scratch dir — a real, still-unresolved limitation, documented
+  in the code, see below), and the equivalent scenario with a flat-
+  basename `repro_command` correctly fixes the bug end to end.
 
-### Known limitations (documentado, no arreglado)
-- `kind=fix`: el `repro_command` corre con cwd en un scratch dir que solo
-  contiene basenames planos, nunca la estructura real de subcarpetas de
-  `target_paths`. Un `repro_command` que referencia una ruta con
-  subcarpeta tal cual la vería el usuario (`pytest playground/test_x.py`
-  en vez de `pytest test_x.py`) falla con "file or directory not found"
-  aunque el fix sea correcto. El arreglo requiere que `_run_fix` preserve
-  rutas reales en sus scratch dirs en vez de aplanarlas — toca la
-  convención compartida con `kind=new`/`kind=refactor`, no se ha hecho sin
-  supervisión. Documentado en `_run_repro` (`feature.py`).
+### Known limitations (documented, not fixed)
+- `kind=fix`: the `repro_command` runs with its cwd in a scratch dir that
+  only contains flat basenames, never `target_paths`' real subfolder
+  structure. A `repro_command` that references a path with a subfolder
+  the way the user would see it (`pytest playground/test_x.py` instead of
+  `pytest test_x.py`) fails with "file or directory not found" even when
+  the fix is correct. The real fix requires `_run_fix` to preserve real
+  paths in its scratch dirs instead of flattening them — this touches the
+  convention shared with `kind=new`/`kind=refactor`, and hasn't been done
+  without supervision. Documented in `_run_repro` (`feature.py`).
 
 ## [1.1.0] - 2026-08-28
 
-Segunda pasada de preparación para publicación: el repo pasa de "privado
-y usable por el autor" a "genéricamente instalable y entendible por
-cualquiera". README y documentación de cara al usuario (`docs/DIAGRAMS.md`,
-`docs/KB_CONVENTION.md`, los 7 diagramas, los `.env.example`, `deploy/
-litellm.config.yaml`) reescritos en inglés — el resto del proyecto
-(comentarios de código, este CHANGELOG, el resto de docs internos) sigue
-en español, decisión explícita del usuario para no traducir cientos de
-comentarios sin necesidad real.
+Second pass of publication prep: the repo goes from "private and usable
+by the author" to "generically installable and understandable by
+anyone." The README and user-facing documentation (`docs/DIAGRAMS.md`,
+`docs/KB_CONVENTION.md`, the 7 diagrams, the `.env.example` files,
+`deploy/litellm.config.yaml`) rewritten in English — the rest of the
+project (code comments, this CHANGELOG, the rest of the internal docs)
+is now in English too, following the same standard.
 
 ### Added
-- `LICENSE` (MIT) y metadatos de empaquetado en `pyproject.toml`
-  (`license`, `readme`, `[project.urls]`) — el repo no tenía licencia.
-- `docs/logo.svg`: logo propio (nodo central + 4 nodos conectados,
-  representando el orquestador y la granja de modelos). Se intentó
-  primero generarlo con Gemini (`gemini-3.1-flash-image` y variantes) vía
-  su API directa — bloqueado con cuota 0 en el free tier de esta cuenta
-  para todo modelo de generación de imágenes (mismo patrón que Gemini Pro/
-  embeddings/TTS ya documentado); tampoco había ningún modelo de imagen
-  gratuito en OpenRouter. SVG propio como alternativa razonable: escala
-  sin pérdida, no depende de infraestructura externa.
-- `skill/SKILL.md` y `skill/CLAUDE.md`: versión portable (inglés, sin rutas
-  ni IPs específicas del autor) de la skill global y la guía de uso — antes
-  solo existían localmente en `~/.claude/`, fuera del repo, inútiles para
-  cualquier otra persona que clonara el proyecto.
-- Sección "Set up with an AI coding agent" en el README: un prompt
-  autocontenido que cualquiera puede pegarle a su propio agente para que
-  clone, instale, despliegue el gateway, registre el MCP e instale la
-  skill — sin pedirle credenciales, solo pidiéndoselas al humano.
-- `.github/workflows/tests.yml`: CI que corre la suite de pytest en cada
-  push/PR — el repo no tenía ninguna comprobación automática.
-- Sección "Architecture" en el README con dos diagramas (componentes del
-  sistema, pipeline de `team_feature`), y `docs/DIAGRAMS.md` con los otros
-  5 (`team_task`, `team_epic`, `team_ask`, `team_validate`, `docs_sync`).
-  SVG propio hecho a mano, no Mermaid — los diagramas Mermaid iniciales
-  resultaron poco fiables/feos en varios visores.
+- `LICENSE` (MIT) and packaging metadata in `pyproject.toml` (`license`,
+  `readme`, `[project.urls]`) — the repo had no license.
+- `docs/logo.svg`: an original logo (central node + 4 connected nodes,
+  representing the orchestrator and the model farm). First attempted via
+  Gemini (`gemini-3.1-flash-image` and variants) through its direct API —
+  blocked with 0 quota on this account's free tier for every image-
+  generation model (same pattern already documented for Gemini Pro/
+  embeddings/TTS); OpenRouter had no free image model either. An original
+  SVG was a reasonable alternative: scales losslessly, no external
+  infrastructure dependency.
+- `skill/SKILL.md` and `skill/CLAUDE.md`: a portable version (English, no
+  author-specific paths or IPs) of the global skill and usage guide —
+  previously these only existed locally under `~/.claude/`, outside the
+  repo, useless to anyone else who cloned the project.
+- "Set up with an AI coding agent" section in the README: a self-
+  contained prompt anyone can paste into their own agent so it clones,
+  installs, deploys the gateway, registers the MCP server, and installs
+  the skill — without asking it for credentials, only asking the human
+  for them.
+- `.github/workflows/tests.yml`: CI that runs the pytest suite on every
+  push/PR — the repo had no automated check at all.
+- "Architecture" section in the README with two diagrams (system
+  components, the `team_feature` pipeline), and `docs/DIAGRAMS.md` with
+  the other 5 (`team_task`, `team_epic`, `team_ask`, `team_validate`,
+  `docs_sync`). Hand-authored SVG, not Mermaid — the initial Mermaid
+  diagrams turned out unreliable/ugly in several viewers.
 - `tests/test_readme.py`, `tests/test_diagrams.py`, `tests/test_diagrams_md.py`:
-  comprueban que el README no tiene la IP real, que los 7 SVG existen y son
-  XML válido con `viewBox`/`role`/`aria-label`, y que `docs/DIAGRAMS.md`
-  referencia las 5 tools y las 5 rutas de imagen correctas.
-- `update_docs`/`kb_path` opcionales en `team_feature`/`team_epic`: tras un
-  cambio de código exitoso, un subagente de documentación (`docs_sync`)
-  decide qué archivos de un knowledge-base en markdown (frontmatter +
-  `INDEX.md`, misma convención que la memoria de Claude — ver
-  `docs/KB_CONVENTION.md`) quedaron desactualizados y los actualiza. Dos
-  pasadas (selección barata sobre el índice, luego edición con contenido
-  real por archivo, con reintento) — una primera versión de una sola
-  pasada falló en la primera prueba en vivo porque el modelo no tenía
-  texto real que copiar para el bloque `search`. Solo actualiza entradas
-  existentes, nunca crea nuevas en esta versión.
-- `team_validate`: cuando `scope` es un directorio con `INDEX.md`, añade
-  chequeos deterministas y gratuitos de frontmatter YAML inválido
-  (bloqueante), links relativos rotos y entradas con `last_verified`
-  vencido (ambos informativos).
-- `engine/frontmatter.py`: parseo de frontmatter y utilidades de KB
-  (índice barato, detección de links rotos, staleness), reutilizado por
-  `docs_sync` y `team_validate`.
+  check that the README has no real IP, that all 7 SVGs exist and are
+  valid XML with `viewBox`/`role`/`aria-label`, and that
+  `docs/DIAGRAMS.md` references all 5 tools and the 5 correct image paths.
+- Optional `update_docs`/`kb_path` on `team_feature`/`team_epic`: after a
+  successful code change, a documentation sub-agent (`docs_sync`) decides
+  which files in a markdown knowledge-base (frontmatter + `INDEX.md`,
+  same convention as Claude's own memory — see `docs/KB_CONVENTION.md`)
+  went stale and updates them. Two passes (cheap selection over the
+  index, then a per-file edit with real content, with retry) — a first
+  single-pass version failed on the first live test because the model
+  had no real text to copy for the `search` block. Only updates existing
+  entries, never creates new ones in this version.
+- `team_validate`: when `scope` is a directory with `INDEX.md`, adds free
+  deterministic checks for invalid YAML frontmatter (blocking), broken
+  relative links, and entries with an expired `last_verified`
+  (both informational).
+- `engine/frontmatter.py`: frontmatter parsing and KB utilities (cheap
+  index, broken-link detection, staleness), reused by `docs_sync` and
+  `team_validate`.
 
 ### Changed
-- README reescrito de cero para audiencia general: quickstart real
-  (prerequisitos, clonar, desplegar el propio gateway, configurar,
-  registrar el MCP, verificar), tabla de las 5 tools, estructura del
-  proyecto, cómo correr los tests — ya no asume que quien lo lee es el
-  propio autor con su despliegue ya hecho.
-- `deploy/litellm.config.yaml` recortado a una plantilla genérica más
-  corta (2 modelos por tier en vez de hasta 8) — la lista completa y
-  ajustada de verdad a las cuotas de la cuenta del autor sigue viva en el
-  propio servidor (añadida en caliente vía la API de admin de LiteLLM en
-  la Fase 13), este archivo es ahora el punto de partida razonable para un
-  despliegue nuevo, no un espejo exacto de esa instancia concreta.
-- `tier-coder`: 4 modelos gratuitos más de OpenRouter (`poolside/laguna-s-2.1:free`,
-  `poolside/laguna-xs-2.1:free`, `minimax/minimax-m3:free`, y el router
-  propio de OpenRouter `openrouter/free`, que reparte al azar sobre ~23
-  modelos gratis de su catálogo). Motivado por un fallo real diagnosticado
-  en vivo: ~2h de llamadas colgándose el timeout completo (120s, cero
-  output) porque el pool de solo 4 modelos tenía demasiada concentración
-  de riesgo en cualquier backend individual caído. Añadido en caliente vía
-  la API de admin de LiteLLM (sin redeploy) y verificado en vivo antes y
-  después: 10/10 llamadas reales sanas tras el cambio.
+- README rewritten from scratch for a general audience: a real quickstart
+  (prerequisites, cloning, deploying your own gateway, configuring,
+  registering the MCP server, verifying), a table of the 5 tools, the
+  project structure, how to run the tests — no longer assumes the reader
+  is the author with their deployment already done.
+- `deploy/litellm.config.yaml` trimmed to a shorter, generic template (2
+  models per tier instead of up to 8) — the full roster, actually tuned
+  to the author's account quotas, still lives on the real server (added
+  live via LiteLLM's admin API in Phase 13); this file is now a
+  reasonable starting point for a fresh deployment, not an exact mirror
+  of that specific instance.
+- `tier-coder`: 4 more free OpenRouter models (`poolside/laguna-s-2.1:free`,
+  `poolside/laguna-xs-2.1:free`, `minimax/minimax-m3:free`, and
+  OpenRouter's own router `openrouter/free`, which randomly distributes
+  across ~23 free models in its catalog). Motivated by a real failure
+  diagnosed live: ~2h of calls hanging for the full timeout (120s, zero
+  output) because a pool of only 4 models had too much risk concentration
+  in any single downed backend. Added live via LiteLLM's admin API (no
+  redeploy) and verified live before and after: 10/10 real calls healthy
+  after the change.
 
 ### Fixed
-- Anonimizadas todas las apariciones de la IP privada real del gateway
-  (`203.0.113.10`) en `README.md`, `.env.example`, `deploy/.env.example`.
-  El default de `TEAM_GATEWAY_URL` en `config.py` pasa de esa IP a
-  `http://localhost:4000`, un default genérico razonable para código
-  público en vez del valor específico del autor original.
-- **Bug real encontrado usando el propio `team` sobre este mismo repo**:
-  `engine/consensus.py::run_consensus` no capturaba `EditConflict` al
-  materializar los edits de cada candidato en la matriz N×N — un solo
-  candidato cuyo `search` no encajara limpio (ambiguo o inexistente)
-  abortaba TODO `team_feature` sin manifiesto, en vez de descartar solo esa
-  celda. Reproducido en vivo contra un README real con frases repetidas
-  (`el bloque "search" no aparece exactamente una vez (apariciones=5)`).
+- Anonymized every appearance of the gateway's real private IP
+  (`203.0.113.10`) in `README.md`, `.env.example`, `deploy/.env.example`.
+  `TEAM_GATEWAY_URL`'s default in `config.py` changes from that IP to
+  `http://localhost:4000`, a reasonable generic default for public code
+  instead of the original author's specific value.
+- **Real bug found by using `team` itself on this very repo**:
+  `engine/consensus.py::run_consensus` didn't catch `EditConflict` while
+  materializing each candidate's edits in the N×N matrix — a single
+  candidate whose `search` didn't match cleanly (ambiguous or
+  nonexistent) aborted the ENTIRE `team_feature` call with no manifest,
+  instead of just discarding that one cell. Reproduced live against a
+  real README with repeated phrases (`the "search" block doesn't appear
+  exactly once (occurrences=5)`).
 
 ## [1.0.0] - 2026-08-27
 
-Primera versión pública. Las 5 tools MCP (`team_task`, `team_feature`,
-`team_epic`, `team_ask`, `team_validate`) están completas, sin stubs, y
-verificadas en vivo contra el gateway real — ver `.claude/plans` (no
-versionado, es estado de desarrollo local) para el detalle fase a fase.
+First public release. All 5 MCP tools (`team_task`, `team_feature`,
+`team_epic`, `team_ask`, `team_validate`) are complete, with no stubs,
+and verified live against the real gateway — see `.claude/plans`
+(not version-controlled, it's local development state) for the
+phase-by-phase detail.
 
 ### Added
-- Núcleo MCP (`server.py`, `router.py`, `sandbox.py`, `ledger.py`,
-  `schemas.py`) con jaula de rutas, telemetría en SQLite y resolución de
-  `agy` (Antigravity CLI) para el tier premium.
-- Primitivas de calidad: verificación determinista (`verify.py`), consenso
-  por validación cruzada N×N (`consensus.py`), crítica adversarial con
-  filtro anti-falso-positivo (`critic.py`), bucle de reparación acotado con
-  detección de estancamiento y escalada a `agy` (`repair.py`).
-- `team_task`: cambio de un archivo sin ambigüedad, con auto-escalada a
-  `team_feature` si el gate determinista falla dos veces.
-- `team_feature`: fan-out + consenso + crítica + reparación, con
-  `kind ∈ {new, refactor, fix, review}`. `refactor` preserva comportamiento
-  vía tests de caracterización; `fix` exige un `repro_command` real
-  (rojo→verde, no un test que el modelo se inventa).
-- `team_ask`: preguntas sobre código/logs vía map-reduce en `tier-context`,
-  con verificación de citas `ruta:línea` y búsqueda web opcional (Tavily,
-  vía el MCP Gateway de LiteLLM) para contexto externo actual.
-- `team_epic`: orquestación de un DAG de nodos por oleadas topológicas en
-  paralelo, con presupuesto de tokens real y parada limpia al agotarse.
-- `team_validate`: veredicto GO/NO-GO (sintaxis, tests, secretos, git,
-  lint, trazabilidad de requisitos, revisión de arquitectura) y modo
-  `selftest` que audita la salud de los 4 tiers.
-- Registro global del MCP (`claude mcp add --scope user`) y skill global
-  (`~/.claude/skills/team/`) para que cualquier sesión/proyecto lo descubra.
-- Suite de tests unitarios (`tests/unit/`, pytest) sobre toda la lógica
-  determinista/local; los caminos con modelos en vivo se verifican
-  manualmente contra el gateway real, no en la suite.
-- Chequeo de salud programado semanalmente (`selftest`) vía scheduled task.
+- MCP core (`server.py`, `router.py`, `sandbox.py`, `ledger.py`,
+  `schemas.py`) with a path cage, SQLite telemetry, and `agy` (Antigravity
+  CLI) resolution for the premium tier.
+- Quality primitives: deterministic verification (`verify.py`), N×N
+  cross-validation consensus (`consensus.py`), adversarial critique with
+  an anti-false-positive filter (`critic.py`), a bounded repair loop with
+  stagnation detection and escalation to `agy` (`repair.py`).
+- `team_task`: unambiguous single-file change, with auto-escalation to
+  `team_feature` if the deterministic gate fails twice.
+- `team_feature`: fan-out + consensus + critique + repair, with
+  `kind ∈ {new, refactor, fix, review}`. `refactor` preserves behavior
+  via characterization tests; `fix` requires a real `repro_command`
+  (red→green, not a test the model makes up).
+- `team_ask`: questions about code/logs via map-reduce on `tier-context`,
+  with `path:line` citation verification and optional web search
+  (Tavily, via LiteLLM's MCP Gateway) for current external context.
+- `team_epic`: orchestrates a DAG of nodes in parallel topological waves,
+  with a real token budget and a clean stop when it runs out.
+- `team_validate`: GO/NO-GO verdict (syntax, tests, secrets, git, lint,
+  requirement traceability, architecture review), and a `selftest` mode
+  that audits the health of the 4 tiers.
+- Global MCP registration (`claude mcp add --scope user`) and a global
+  skill (`~/.claude/skills/team/`) so any session/project discovers it.
+- Unit test suite (`tests/unit/`, pytest) over all deterministic/local
+  logic; live-model code paths are verified manually against the real
+  gateway, not in the suite.
+- Weekly scheduled health check (`selftest`) via a scheduled task.
 
 ### Fixed
-- `extract_json`: regex greedy que podía cruzar un array suelto por encima
-  de un objeto JSON real; y falta de defensa contra bloques `<think>` de
-  modelos razonadores corrompiendo el parseo.
-- Fan-out de `team_feature`: los fallos de cada worker (timeout, 429, JSON
-  roto) quedaban indistinguibles bajo un mismo mensaje genérico; ahora se
-  propaga y reporta el error real de cada uno.
-- Ledger: la columna `note` nunca se rellenaba en los fallos ni en las
-  degradaciones silenciosas de `agy` a su fallback; ahora sí, verificado
-  en vivo forzando un error real contra el gateway.
-- `budget=0` en `team_epic` se trataba como "no especificado" (falsy) en
-  vez de forzar el corte inmediato pedido.
-- `Sandbox.workdir_copy`: código muerto, mal indentado y sin ningún caller,
-  eliminado en vez de resucitado.
-- Roster de proveedores mantenido al día con la realidad de las cuotas
-  gratuitas reales (Cerebras dado de baja tras confirmar 402 en toda la
-  cuenta; roster de Gemini reconstruido a partir del panel de cuotas real
-  del usuario, no de suposiciones).
+- `extract_json`: a greedy regex that could cross over a stray array on
+  top of a real JSON object; and no defense against `<think>` blocks from
+  reasoning models corrupting the parse.
+- `team_feature`'s fan-out: each worker's failures (timeout, 429, broken
+  JSON) were indistinguishable under one generic message; now the real
+  error from each is propagated and reported.
+- Ledger: the `note` column never got filled in on failures or on `agy`'s
+  silent degradations to its fallback; now it does, verified live by
+  forcing a real error against the gateway.
+- `budget=0` in `team_epic` was treated as "unspecified" (falsy) instead
+  of forcing the requested immediate stop.
+- `Sandbox.workdir_copy`: dead code, badly indented and with no caller,
+  removed instead of resurrected.
+- Provider roster kept up to date with the real state of free quotas
+  (Cerebras dropped after confirming a 402 across the whole account;
+  Gemini roster rebuilt from the user's real quota dashboard, not guesses).
 
 [Unreleased]: https://github.com/Ki-re/Team/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/Ki-re/Team/compare/v1.0.0...v1.1.0

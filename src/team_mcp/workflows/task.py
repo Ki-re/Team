@@ -1,13 +1,13 @@
-"""team_task: cambio pequeño en 1 archivo, sin ambigüedad, sin tier premium.
+"""team_task: small, unambiguous change to 1 file, no premium tier.
 
-Pipeline (ver plan, Capa 0/1 simplificada a n=1):
-  1. tier-coder propone un único FileEdit en JSON estricto.
-  2. Se prueba en un scratch dir (nunca sobre el archivo real) con verify.py.
-  3. Si falla el gate determinista: 1 reparación con el error literal.
-  4. Si sigue fallando tras la reparación: se marca `escalated_from="task"`
-     en el manifiesto en vez de aplicar nada. team_feature (fase 3) es quien
-     debe recogerlo — team_task nunca entrega trabajo peor de lo prometido.
-  5. Si pasa: escritura atómica vía Sandbox (respeta TEAM_DRY_RUN).
+Pipeline (see plan, Layer 0/1 simplified to n=1):
+  1. tier-coder proposes a single FileEdit as strict JSON.
+  2. It's tested in a scratch dir (never on the real file) with verify.py.
+  3. If the deterministic gate fails: 1 repair with the literal error.
+  4. If it still fails after the repair: marked `escalated_from="task"`
+     in the manifest instead of applying anything. team_feature (phase 3)
+     is meant to pick it up — team_task never delivers worse work than promised.
+  5. If it passes: atomic write via Sandbox (respects TEAM_DRY_RUN).
 """
 
 from __future__ import annotations
@@ -28,29 +28,29 @@ _WORKFLOW = "team_task"
 _MAX_ATTEMPTS = 2
 
 _PROMPT = """\
-Tarea: {instruction}
+Task: {instruction}
 
-Archivo objetivo: {path}
-Contenido actual:
+Target file: {path}
+Current content:
 ---
 {content}
 ---
 {error_context}
-Responde ÚNICAMENTE con un objeto JSON con esta forma exacta, sin texto
-adicional ni markdown:
-{{"search": "<fragmento EXACTO del contenido actual a reemplazar, o \\"\\" si el archivo es nuevo>",
-  "replace": "<contenido nuevo que sustituye a `search`>"}}
+Respond ONLY with a JSON object in this exact shape, with no extra text
+or markdown:
+{{"search": "<EXACT fragment of the current content to replace, or \\"\\" if the file is new>",
+  "replace": "<new content that replaces `search`>"}}
 
-El campo `search` debe copiarse literalmente del contenido actual (incluida
-indentación). Si el archivo no existe todavía, usa `search: ""` y pon el
-contenido completo del archivo nuevo en `replace`.
+The `search` field must be copied literally from the current content
+(indentation included). If the file doesn't exist yet, use `search: ""`
+and put the new file's full content in `replace`.
 """
 
 
 def _extract_json(raw: str) -> dict:
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if not match:
-        raise ValueError(f"sin JSON en la respuesta del modelo: {raw[:200]}")
+        raise ValueError(f"no JSON in the model's response: {raw[:200]}")
     return json.loads(match.group(0))
 
 
@@ -79,8 +79,8 @@ async def run(
             data = _extract_json(raw)
             edit = FileEdit(path=target_path, search=data["search"], replace=data["replace"])
         except (ValueError, KeyError) as exc:
-            last_error = f"JSON inválido del worker: {exc}"
-            error_context = f"\nEl intento anterior falló: {last_error}\n"
+            last_error = f"invalid JSON from the worker: {exc}"
+            error_context = f"\nThe previous attempt failed: {last_error}\n"
             continue
 
         with tempfile.TemporaryDirectory(prefix="team_task_") as tmp:
@@ -91,14 +91,14 @@ async def run(
             try:
                 if edit.search:
                     if content.count(edit.search) != 1:
-                        raise EditConflict("search no coincide exactamente una vez")
+                        raise EditConflict("search doesn't match exactly once")
                     new_content = content.replace(edit.search, edit.replace, 1)
                 else:
                     new_content = edit.replace
                 scratch_file.write_text(new_content, encoding="utf-8")
             except EditConflict as exc:
                 last_error = str(exc)
-                error_context = f"\nEl intento anterior falló: {last_error}\n"
+                error_context = f"\nThe previous attempt failed: {last_error}\n"
                 continue
 
             result = await verify_candidate(VerifyTarget(
@@ -112,19 +112,19 @@ async def run(
             except (SandboxViolation, EditConflict) as exc:
                 return Manifest(
                     tool=_WORKFLOW, files_changed=[], tests_status="not_run",
-                    summary=f"verificado pero no se pudo escribir: {exc}",
+                    summary=f"verified but couldn't write: {exc}",
                     dry_run=config.dry_run,
                 )
             return Manifest(
                 tool=_WORKFLOW,
                 files_changed=changed,
                 tests_status="green" if result.tests_run else "not_run",
-                summary=f"cambio aplicado en {target_path} (intento {attempt}/{_MAX_ATTEMPTS})",
+                summary=f"change applied to {target_path} (attempt {attempt}/{_MAX_ATTEMPTS})",
                 dry_run=config.dry_run,
             )
 
-        last_error = result.error_output or "gate determinista falló sin detalle"
-        error_context = f"\nEl intento anterior falló la verificación:\n{last_error[:800]}\n"
+        last_error = result.error_output or "deterministic gate failed with no detail"
+        error_context = f"\nThe previous attempt failed verification:\n{last_error[:800]}\n"
 
     return Manifest(
         tool=_WORKFLOW,
@@ -132,8 +132,8 @@ async def run(
         files_changed=[],
         tests_status="red",
         summary=(
-            f"team_task no logró un candidato válido tras {_MAX_ATTEMPTS} intentos: "
-            f"{last_error[:300]}. Requiere team_feature."
+            f"team_task couldn't produce a valid candidate after {_MAX_ATTEMPTS} attempts: "
+            f"{last_error[:300]}. Requires team_feature."
         ),
         dry_run=config.dry_run,
     )

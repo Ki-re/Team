@@ -7,7 +7,7 @@ from team_mcp.engine.verify import _parses
 
 
 def test_passes_gate_true_when_parses_even_with_lint_issues():
-    # decisión de la Fase 4: solo el parseo bloquea, lint es informativo
+    # Phase 4 decision: only parsing blocks, lint is informational
     result = VerificationResult(candidate_id="x", parses=True, lint_ok=False)
     assert result.passes_gate is True
 

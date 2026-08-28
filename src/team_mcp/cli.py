@@ -1,8 +1,8 @@
-"""CLI de diagnóstico: `python -m team_mcp.cli probe|run`.
+"""Diagnostic CLI: `python -m team_mcp.cli probe|run`.
 
-No es la vía de producción (esa es server.py vía stdio/MCP) — existe para
-poder verificar cada pieza del sistema de forma aislada durante el
-desarrollo, tal como describe la sección "Verificación end-to-end" del plan.
+Not the production path (that's server.py via stdio/MCP) — it exists so
+each piece of the system can be verified in isolation during
+development, as described in the plan's "End-to-end verification" section.
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ async def _probe_gateway(router: Router) -> None:
 async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwargs: dict) -> None:
     from team_mcp.workflows import ask, epic, feature, task, validate
 
-    # cada workflow.run tiene una firma distinta (kwargs distintos) — Any es
-    # deliberado aquí, es un despachador dinámico por diseño, no un olvido.
+    # each workflow.run has a different signature (different kwargs) — Any
+    # is deliberate here, it's a dynamic dispatcher by design, not an oversight.
     handlers: dict[str, Callable[..., Any]] = {
         "team_task": task.run,
         "team_feature": feature.run,
@@ -43,7 +43,7 @@ async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwarg
     }
     handler = handlers.get(tool)
     if handler is None:
-        print(f"tool desconocida: {tool}. Opciones: {list(handlers)}", file=sys.stderr)
+        print(f"unknown tool: {tool}. Options: {list(handlers)}", file=sys.stderr)
         raise SystemExit(2)
 
     manifest = await handler(router, ledger, config, **kwargs)
@@ -51,19 +51,19 @@ async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwarg
 
 
 def main() -> None:
-    # los manifiestos pueden contener texto generado por modelos con
-    # cualquier carácter Unicode (visto crashear con "≈" contra la consola
-    # cp1252 de Windows) — la consola por defecto no lo soporta, forzamos
-    # utf-8 con fallback seguro en vez de confiar en la codificación del SO.
+    # manifests can contain model-generated text with any Unicode
+    # character (seen crashing with "≈" against Windows' cp1252 console)
+    # — the default console doesn't support it, so we force utf-8 with a
+    # safe fallback instead of trusting the OS encoding.
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
     parser = argparse.ArgumentParser(prog="team_mcp.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_probe = sub.add_parser("probe", help="comprobar disponibilidad de un provider")
+    p_probe = sub.add_parser("probe", help="check a provider's availability")
     p_probe.add_argument("--provider", choices=["agy", "gateway"], required=True)
 
-    p_run = sub.add_parser("run", help="ejecutar un workflow directamente")
+    p_run = sub.add_parser("run", help="run a workflow directly")
     p_run.add_argument("tool", choices=["team_task", "team_feature", "team_epic", "team_ask", "team_validate"])
     p_run.add_argument("--spec")
     p_run.add_argument("--instruction")
@@ -76,7 +76,7 @@ def main() -> None:
     p_run.add_argument("--question")
     p_run.add_argument("--spec-file")
     p_run.add_argument("--allow-web-search", action="store_true")
-    p_run.add_argument("--plan-file", help="JSON con la lista de nodos para team_epic")
+    p_run.add_argument("--plan-file", help="JSON with the list of nodes for team_epic")
     p_run.add_argument("--budget", type=int, default=None)
     p_run.add_argument("--selftest", action="store_true")
     p_run.add_argument("--dry-run", action="store_true")

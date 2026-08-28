@@ -1,8 +1,8 @@
-"""Punto único de acceso a los 4 tiers para el resto del código del MCP.
+"""Single access point to the 4 tiers for the rest of the MCP's code.
 
-Los pipelines no hablan con GatewayProvider/PremiumProvider directamente:
-piden `router.fast(...)`, `router.coder(...)`, etc. Esto mantiene el ledger
-y el logging de proveedor centralizados en un solo lugar.
+The pipelines don't talk to GatewayProvider/PremiumProvider directly:
+they ask for `router.fast(...)`, `router.coder(...)`, etc. This keeps the
+ledger and provider logging centralized in one place.
 """
 
 from __future__ import annotations
@@ -35,9 +35,9 @@ class Router:
                 tier, messages, temperature=temperature, max_tokens=max_tokens
             )
         except Exception as exc:
-            # antes `note` quedaba siempre vacío: un timeout, un 429 y un
-            # JSON roto quedaban indistinguibles en el ledger, forzando a
-            # diagnosticar leyendo código en vez de la propia telemetría.
+            # `note` used to always stay empty: a timeout, a 429, and
+            # broken JSON were indistinguishable in the ledger, forcing a
+            # code read to diagnose instead of using the telemetry itself.
             self._ledger.record(SpendEvent(
                 workflow=workflow, tier=tier, model=tier,
                 tokens_in=0, tokens_out=0,
@@ -76,16 +76,16 @@ class Router:
         )
 
     async def context_with_tools(self, workflow: str, prompt: str) -> str:
-        """Como `context()`, pero con acceso a las tools MCP registradas en
-        el gateway (hoy: solo Tavily —search/extract/map/crawl—, ver Fase 7
-        del plan). Solo tier-context: es donde el tool-calling es fiable
-        con los modelos gratis actuales."""
+        """Like `context()`, but with access to the MCP tools registered
+        on the gateway (today: only Tavily — search/extract/map/crawl —,
+        see plan Phase 7). tier-context only: it's where tool-calling is
+        reliable with the currently available free models."""
         t0 = time.monotonic()
-        # require_approval: "never" es imprescindible — sin él LiteLLM
-        # devuelve la function_call pendiente de aprobación humana en vez
-        # de ejecutarla, y la respuesta nunca llega a texto final
-        # (confirmado en vivo el 2026-08-24: con el flag, LiteLLM ejecuta
-        # la tool de verdad, ver tool_execution_results en la respuesta).
+        # require_approval: "never" is required — without it LiteLLM
+        # returns the function_call pending human approval instead of
+        # executing it, and the response never reaches final text
+        # (confirmed live on 2026-08-24: with the flag, LiteLLM actually
+        # executes the tool, see tool_execution_results in the response).
         tools = [{
             "type": "mcp", "server_url": "litellm_proxy",
             "server_label": "tavily", "require_approval": "never",
@@ -118,8 +118,9 @@ class Router:
             model=f"agy:{self.premium.last_used}",
             tokens_in=0, tokens_out=0,
             latency_ms=(time.monotonic() - t0) * 1000, ok=True,
-            # si agy falló y degradó a fallback, el motivo queda aquí en vez
-            # de perderse — antes `last_used="fallback"` no decía por qué.
+            # if agy failed and degraded to the fallback, the reason ends
+            # up here instead of getting lost — before, `last_used="fallback"`
+            # didn't say why.
             note=self.premium.last_error or "",
         ))
         return result

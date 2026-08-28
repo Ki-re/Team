@@ -1,15 +1,16 @@
-"""Servidor MCP "Team": 5 entrypoints graduados por complejidad para Claude.
+"""MCP "Team" server: 5 entrypoints graded by complexity for the orchestrator.
 
-Regla dura del proyecto: nunca se devuelven resultados intermedios a Claude.
-Cada tool es un pipeline completo que termina en un Manifest compacto.
-Los pipelines internos (quick, digest, implement, refactor, fix, investigate,
-review, epic, validate, selftest) viven en workflows/ y no se exponen
-directamente — ver la sección "Superficie expuesta a Claude" del plan.
+Hard rule of the project: intermediate results are never returned to the
+orchestrating agent. Every tool is a complete pipeline that ends in a
+compact Manifest. The internal pipelines (quick, digest, implement,
+refactor, fix, investigate, review, epic, validate, selftest) live in
+workflows/ and aren't exposed directly — see the "Surface exposed to the
+orchestrator" section of the plan.
 
-Nota de API: el SDK `mcp` instalado (2.0.0) expone `mcp.server.mcpserver.
-MCPServer`, el sucesor de FastMCP — no la API de decoradores
-`@Server().list_tools()/call_tool()` de mcp 1.x. Los tipos de cada función
-decorada con `@mcp.tool()` generan el JSON Schema automáticamente.
+API note: the installed `mcp` SDK (2.0.0) exposes `mcp.server.mcpserver.
+MCPServer`, the successor to FastMCP — not the 1.x decorator API
+(`@Server().list_tools()/call_tool()`). The types of each function
+decorated with `@mcp.tool()` generate the JSON Schema automatically.
 """
 
 from __future__ import annotations
@@ -37,9 +38,9 @@ mcp = MCPServer(name="team")
 
 @mcp.tool(
     description=(
-        "Cambio pequeño y sin ambigüedad en 1 archivo: formateo, regex, "
-        "renombrado, docstring, fix trivial. Sin tier premium. Si el gate "
-        "determinista falla 2 veces, escala sola a team_feature."
+        "Small, unambiguous change to 1 file: formatting, regex, "
+        "rename, docstring, trivial fix. No premium tier. If the "
+        "deterministic gate fails twice, escalates on its own to team_feature."
     )
 )
 async def team_task(instruction: str, target_path: str) -> dict:
@@ -49,21 +50,21 @@ async def team_task(instruction: str, target_path: str) -> dict:
 
 @mcp.tool(
     description=(
-        "Unidad de trabajo real: implementar (kind=new, default), "
-        "refactorizar (kind=refactor, preserva comportamiento vía tests de "
-        "caracterización), arreglar un bug (kind=fix, requiere "
-        "repro_command: un comando que hoy falla y debe pasar a salir con "
-        "código 0), o revisar código sin generarlo (kind=review). Fan-out "
-        "de N workers + consenso por validación cruzada + crítica premium "
-        "+ reparación acotada. Si el proyecto tiene un knowledge-base en "
-        "markdown (carpeta con INDEX.md + un archivo por tema con "
-        "frontmatter, misma convención que la memoria de Claude — ver "
-        "docs/KB_CONVENTION.md), pasa update_docs=True y kb_path a esa "
-        "carpeta para que, tras un cambio exitoso, se actualicen los "
-        "archivos de KB EXISTENTES que quedaron desactualizados (no crea "
-        "entradas nuevas). Si el KB vive en un repo dedicado en vez de una "
-        "carpeta de este proyecto, su ruta local debe estar en "
-        "TEAM_SANDBOX_ROOTS o el write quedará rechazado por el sandbox."
+        "A real unit of work: implement (kind=new, default), "
+        "refactor (kind=refactor, preserves behavior via characterization "
+        "tests), fix a bug (kind=fix, requires "
+        "repro_command: a command that currently fails and must end up "
+        "exiting with code 0), or review code without generating it "
+        "(kind=review). Fan-out of N workers + cross-validation consensus "
+        "+ premium critique + bounded repair. If the project has a "
+        "markdown knowledge-base (a folder with INDEX.md + one file per "
+        "topic with frontmatter, same convention as Claude's own memory — "
+        "see docs/KB_CONVENTION.md), pass update_docs=True and kb_path to "
+        "that folder so that, after a successful change, the EXISTING KB "
+        "files that went stale get updated (it never creates new "
+        "entries). If the KB lives in a dedicated repo instead of a "
+        "folder of this project, its local path must be in "
+        "TEAM_SANDBOX_ROOTS or the write will be rejected by the sandbox."
     )
 )
 async def team_feature(
@@ -84,11 +85,11 @@ async def team_feature(
 
 @mcp.tool(
     description=(
-        "Plan multi-tarea con dependencias (DAG). Orquesta team_feature "
-        "sobre cada nodo en orden topológico, paralelizando ramas "
-        "independientes, con presupuesto de tokens global. update_docs/"
-        "kb_path: igual que en team_feature, pero UNA sola sincronización "
-        "de documentación al final de todo el epic (no una por nodo)."
+        "Multi-task plan with dependencies (DAG). Orchestrates team_feature "
+        "over each node in topological order, parallelizing independent "
+        "branches, with a global token budget. update_docs/kb_path: same "
+        "as in team_feature, but ONE documentation sync at the end of the "
+        "whole epic (not one per node)."
     )
 )
 async def team_epic(
@@ -104,12 +105,13 @@ async def team_epic(
 
 @mcp.tool(
     description=(
-        "Pregunta sobre código o logs, sin escribir nada. Map-reduce en "
-        "tier-context con verificación de citas (ruta:línea). scope_paths "
-        "acepta archivos y directorios. Si la pregunta necesita contexto "
-        "externo actual (versión de una librería, docs de una API externa, "
-        "algo que no está en scope_paths), pasa allow_web_search=True para "
-        "que use búsqueda web real de verdad, no memoria del modelo."
+        "Question about code or logs, without writing anything. "
+        "Map-reduce on tier-context with citation verification "
+        "(path:line). scope_paths accepts files and directories. If the "
+        "question needs current external context (a library version, an "
+        "external API's docs, something not in scope_paths), pass "
+        "allow_web_search=True so it uses real web search, not the "
+        "model's memory."
     )
 )
 async def team_ask(question: str, scope_paths: list[str], allow_web_search: bool = False) -> dict:
@@ -122,8 +124,8 @@ async def team_ask(question: str, scope_paths: list[str], allow_web_search: bool
 
 @mcp.tool(
     description=(
-        "Cierre: veredicto GO/NO-GO sobre el estado real del workspace "
-        "(build, tests, lint, secretos, trazabilidad de requisitos)."
+        "Closure: GO/NO-GO verdict on the real state of the workspace "
+        "(build, tests, lint, secrets, requirement traceability)."
     )
 )
 async def team_validate(scope: str, spec_original: str | None = None, selftest: bool = False) -> dict:

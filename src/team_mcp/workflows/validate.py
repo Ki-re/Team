@@ -1,12 +1,12 @@
-"""team_validate: veredicto GO/NO-GO (Fase 8 del plan).
+"""team_validate: GO/NO-GO verdict (plan Phase 8).
 
-Los deterministas mandan: cualquiera en rojo fuerza NO-GO sin consultar a
-ningún modelo. Reutiliza lo ya construido en vez de reinventar: `ast.parse`
-(mismo criterio que engine/verify.py), pytest vía sys.executable (mismo
-patrón que feature.py::_TEST_COMMAND), `ask.run()` tal cual para
-trazabilidad de requisitos (hereda la verificación de citas de la Fase 4),
-y `critic.review()` tal cual para la revisión de arquitectura (mismo
-patrón que feature.py::_run_review).
+Deterministics rule: any of them in the red forces NO-GO without
+consulting any model. Reuses what's already built instead of reinventing:
+`ast.parse` (same criterion as engine/verify.py), pytest via
+sys.executable (same pattern as feature.py::_TEST_COMMAND), `ask.run()`
+as-is for requirement traceability (inherits the citation verification
+from Phase 4), and `critic.review()` as-is for the architecture review
+(same pattern as feature.py::_run_review).
 """
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ from team_mcp.workflows import selftest as selftest_pipeline
 
 _WORKFLOW = "team_validate"
 
-# heurística no exhaustiva a propósito — no es un scanner de secretos
-# completo, solo los patrones más obvios y baratos de detectar.
+# deliberately not exhaustive — this isn't a full secret scanner, just the
+# most obvious and cheap-to-detect patterns.
 _SECRET_PATTERNS = [
     re.compile(r"AKIA[0-9A-Z]{16}"),  # AWS access key
-    re.compile(r"sk-[a-zA-Z0-9]{20,}"),  # OpenAI-style / muchos proveedores
+    re.compile(r"sk-[a-zA-Z0-9]{20,}"),  # OpenAI-style / many providers
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"""(?i)password\s*=\s*['"][^'"]{8,}['"]"""),
 ]
@@ -60,18 +60,18 @@ def _check_syntax(py_files: list[Path]) -> tuple[bool, str]:
 
 
 def _check_tests(scope: Path) -> tuple[bool | None, str]:
-    """None = no había tests que correr (no bloquea)."""
+    """None = there were no tests to run (doesn't block)."""
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", str(scope)],
             capture_output=True, text=True, timeout=120, check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"no se pudo ejecutar pytest: {exc}"
+        return False, f"couldn't run pytest: {exc}"
 
     output = proc.stdout + proc.stderr
     if "no tests ran" in output.lower() or "no tests collected" in output.lower():
-        return None, "sin tests en el scope"
+        return None, "no tests in scope"
     return proc.returncode == 0, output[-2000:]
 
 
@@ -96,31 +96,31 @@ def _check_git(scope: Path) -> str:
             capture_output=True, text=True, timeout=15, check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return "git no disponible"
+        return "git not available"
     if proc.returncode != 0:
-        return "scope no es un repo git (o está fuera de uno) — se omite"
+        return "scope is not a git repo (or is outside one) — skipped"
     lines = [line for line in proc.stdout.splitlines() if line.strip()]
-    return f"{len(lines)} archivo(s) con cambios sin commitear" if lines else "working tree limpio"
+    return f"{len(lines)} file(s) with uncommitted changes" if lines else "clean working tree"
 
 
 def _check_lint(py_files: list[Path], scope: Path) -> str:
     if not py_files:
-        return "sin archivos .py que lintar"
+        return "no .py files to lint"
     try:
         proc = subprocess.run(
             [sys.executable, "-m", "ruff", "check", str(scope)],
             capture_output=True, text=True, timeout=60, check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return f"ruff no disponible: {exc}"
-    return "sin hallazgos" if proc.returncode == 0 else proc.stdout[-1000:]
+        return f"ruff not available: {exc}"
+    return "no findings" if proc.returncode == 0 else proc.stdout[-1000:]
 
 
 def _check_kb_frontmatter(kb_path: Path) -> tuple[bool, str]:
-    """Fase 12 del plan: bloqueante igual que _check_syntax, pero solo para
-    archivos que claramente pretenden tener frontmatter (empiezan por
-    `---`) — un .md cualquiera sin frontmatter no es un error, INDEX.md
-    tampoco lo exige."""
+    """Plan Phase 12: blocking just like _check_syntax, but only for files
+    that clearly intend to have frontmatter (start with `---`) — a random
+    .md with no frontmatter isn't an error, and INDEX.md doesn't require
+    one either."""
     errors = []
     for f in sorted(kb_path.rglob("*.md")):
         if f.name.upper() == "INDEX.MD":
@@ -154,7 +154,7 @@ async def run(
     if not scope_path.exists():
         return Manifest(
             tool=_WORKFLOW, tests_status="not_run",
-            summary=f"scope '{scope}' no existe", dry_run=config.dry_run,
+            summary=f"scope '{scope}' doesn't exist", dry_run=config.dry_run,
         )
 
     py_files = _collect_py_files(scope_path)
@@ -170,72 +170,72 @@ async def run(
 
     blockers = []
     if not syntax_ok:
-        blockers.append(f"sintaxis: {syntax_detail}")
+        blockers.append(f"syntax: {syntax_detail}")
     if tests_ok is False:
-        blockers.append(f"tests en rojo: {tests_detail[:500]}")
+        blockers.append(f"tests in the red: {tests_detail[:500]}")
     if not secrets_ok:
-        blockers.append(f"posibles secretos hardcodeados: {secrets_detail}")
+        blockers.append(f"possible hardcoded secrets: {secrets_detail}")
 
-    warnings = [f"lint: {lint_detail}"] if lint_detail != "sin hallazgos" else []
+    warnings = [f"lint: {lint_detail}"] if lint_detail != "no findings" else []
     warnings.append(f"git: {git_status}")
 
-    # Fase 12 del plan: si scope parece un directorio de knowledge-base
-    # (tiene INDEX.md), aplica los mismos chequeos deterministas de
-    # docs_sync.py — gratis, sin consultar a ningún modelo.
+    # Plan Phase 12: if scope looks like a knowledge-base directory (has
+    # INDEX.md), apply the same deterministic checks as docs_sync.py —
+    # free, without consulting any model.
     kb_dir = scope_path if scope_path.is_dir() else None
     if kb_dir and (kb_dir / "INDEX.md").exists():
         kb_ok, kb_detail = _check_kb_frontmatter(kb_dir)
         if not kb_ok:
-            blockers.append(f"frontmatter de KB inválido: {kb_detail}")
+            blockers.append(f"invalid KB frontmatter: {kb_detail}")
         dangling = check_dangling_links(kb_dir)
         if dangling:
-            warnings.append("KB, links rotos: " + "; ".join(dangling[:10]))
+            warnings.append("KB, broken links: " + "; ".join(dangling[:10]))
         stale = check_stale(list_kb_entries(kb_dir))
         if stale:
-            warnings.append("KB, entradas desactualizadas: " + "; ".join(stale[:10]))
+            warnings.append("KB, stale entries: " + "; ".join(stale[:10]))
 
     if spec_original:
         try:
             ask_manifest = await ask.run(
                 router, ledger, config,
                 question=(
-                    f"Para cada requisito de esta spec, indica si está implementado y "
-                    f"dónde (ruta:línea). Spec:\n{spec_original}"
+                    f"For each requirement in this spec, say whether it's "
+                    f"implemented and where (path:line). Spec:\n{spec_original}"
                 ),
                 scope_paths=[str(scope_path)],
             )
-            warnings.append(f"trazabilidad de requisitos:\n{ask_manifest.summary}")
-        except Exception as exc:  # noqa: BLE001 — informativo, no debe tumbar el validate
-            warnings.append(f"trazabilidad de requisitos no disponible: {exc}")
+            warnings.append(f"requirement traceability:\n{ask_manifest.summary}")
+        except Exception as exc:  # noqa: BLE001 — informational, shouldn't sink validate
+            warnings.append(f"requirement traceability unavailable: {exc}")
 
         try:
             edits = [
                 FileEdit(path=str(f.relative_to(scope_path.parent if scope_path.is_file() else scope_path)), search="", replace=f.read_text(encoding="utf-8", errors="replace"))
-                for f in py_files[:20]  # tope: revisión de arquitectura no necesita todo un repo enorme
+                for f in py_files[:20]  # cap: architecture review doesn't need an entire huge repo
             ]
             critic_report = await critic_review(
                 router, _WORKFLOW,
-                f"Evalúa si la arquitectura del código coincide con esta spec:\n{spec_original}",
+                f"Assess whether the code's architecture matches this spec:\n{spec_original}",
                 edits,
-                focus="Enfócate SOLO en arquitectura: ¿la estructura del código refleja lo que pide la spec? ¿faltan piezas? ¿hay algo que contradiga el diseño pedido?",
+                focus="Focus ONLY on architecture: does the code structure reflect what the spec asks for? Are pieces missing? Does anything contradict the requested design?",
             )
             if critic_report.findings:
                 lines = [f"[{f.severity}] {f.file}: {f.claim}" for f in critic_report.findings[:10]]
-                warnings.append("revisión de arquitectura:\n" + "\n".join(lines))
-        except Exception as exc:  # noqa: BLE001 — informativo, no debe tumbar el validate
-            warnings.append(f"revisión de arquitectura no disponible: {exc}")
+                warnings.append("architecture review:\n" + "\n".join(lines))
+        except Exception as exc:  # noqa: BLE001 — informational, shouldn't sink validate
+            warnings.append(f"architecture review unavailable: {exc}")
 
     verdict = "NO-GO" if blockers else "GO"
-    summary_lines = [f"veredicto: {verdict}"]
+    summary_lines = [f"verdict: {verdict}"]
     if blockers:
-        summary_lines.append("bloqueantes:\n- " + "\n- ".join(blockers))
+        summary_lines.append("blockers:\n- " + "\n- ".join(blockers))
     if warnings:
-        summary_lines.append("avisos:\n- " + "\n- ".join(warnings))
+        summary_lines.append("warnings:\n- " + "\n- ".join(warnings))
 
     return Manifest(
         tool=_WORKFLOW,
         tests_status="red" if blockers else ("green" if tests_ok else "not_run"),
-        critic_findings_open=sum(1 for w in warnings if w.startswith("revisión de arquitectura")),
+        critic_findings_open=sum(1 for w in warnings if w.startswith("architecture review")),
         summary="\n\n".join(summary_lines)[:4000],
         dry_run=config.dry_run,
     )

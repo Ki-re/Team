@@ -1,14 +1,15 @@
-"""Consenso por validación cruzada (primitiva #2 del plan).
+"""Cross-validation consensus (plan primitive #2).
 
-El voto por mayoría no funciona con código libre: dos soluciones correctas
-casi nunca son textualmente iguales. En su lugar, cada candidato aporta
-implementación + tests; se construye una matriz N×N ejecutando impl_i contra
-tests_j. Gana quien mejor satisface las suites ajenas — es la señal de que
-capturó la intención compartida, no solo la propia interpretación.
+Majority voting doesn't work with free-form code: two correct solutions
+are almost never textually identical. Instead, each candidate contributes
+implementation + tests; an N×N matrix is built by running impl_i against
+tests_j. The winner is whoever best satisfies the other candidates'
+suites — that's the signal it captured the shared intent, not just its
+own interpretation.
 
-Efectos secundarios detectados gratis, sin gastar tokens en arbitraje:
-- tests_j que NADIE pasa -> ese test está alucinado, se descarta.
-- tests_j que TODOS pasan -> trivial, no aporta señal, no cuenta en el score.
+Side effects detected for free, without spending tokens on arbitration:
+- tests_j that NOBODY passes -> that test is hallucinated, discarded.
+- tests_j that EVERYONE passes -> trivial, no signal, doesn't count toward the score.
 """
 
 from __future__ import annotations
@@ -34,9 +35,9 @@ class ConsensusCandidate:
 
 
 def _normalize_for_hash(edits: list[FileEdit]) -> str:
-    """Formateo laxo: colapsa espacios y quita comentarios de línea simples
-    para que dos candidatos semánticamente idénticos (variando solo
-    indentación/comentarios) se detecten como iguales en el fast path."""
+    """Loose formatting: collapses whitespace and strips simple line
+    comments so two semantically identical candidates (differing only in
+    indentation/comments) get detected as equal in the fast path."""
     parts = []
     for e in sorted(edits, key=lambda x: x.path):
         body = re.sub(r"#.*", "", e.replace)
@@ -81,7 +82,7 @@ async def run_consensus(
 
     matrix: list[CrossMatrixCell] = []
     raw_scores: dict[str, list[float]] = {c.id: [] for c in candidates}
-    test_pass_counts: dict[str, int] = {c.id: 0 for c in candidates}  # como tests_j, cuántos impls pasan
+    test_pass_counts: dict[str, int] = {c.id: 0 for c in candidates}  # as tests_j, how many impls pass
 
     for impl in candidates:
         for tests in candidates:
@@ -96,13 +97,13 @@ async def run_consensus(
                     sandbox.materialize_edits(impl.edits, scratch)
                     sandbox.materialize_edits(tests.test_edits, scratch)
                 except EditConflict:
-                    # un candidato cuyo `search` no encaja limpio contra el
-                    # código base (ambiguo o inexistente) no debe tumbar
-                    # TODA la matriz de consenso — antes esto propagaba y
-                    # abortaba team_feature entero sin manifiesto (visto
-                    # fallar en vivo contra un README real con frases
-                    # repetidas). Cuenta como celda sin tests corridos,
-                    # igual que un candidato que no parsea.
+                    # a candidate whose `search` doesn't match cleanly
+                    # against the base code (ambiguous or nonexistent)
+                    # must not sink the WHOLE consensus matrix — this used
+                    # to propagate and abort team_feature entirely with no
+                    # manifest (seen failing live against a real README
+                    # with repeated phrases). It counts as a cell with no
+                    # tests run, same as a candidate that doesn't parse.
                     result = None
                 else:
                     py_files = [e.path for e in impl.edits] + [e.path for e in tests.test_edits]

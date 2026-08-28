@@ -11,9 +11,9 @@ from team_mcp.engine.schemas import FileEdit
 
 
 def test_force_basename_strips_directories_from_model_output():
-    # mismo bug real que en feature.py: un worker de reparacion copio una
-    # ruta con subcarpeta del error literal en vez del basename, lo que
-    # tumbaba la verificacion en scratch con un EditConflict "no existe".
+    # same real bug as in feature.py: a repair worker copied a path with
+    # a subfolder from the literal error instead of the basename, which
+    # crashed scratch verification with an EditConflict "doesn't exist".
     edits = [
         FileEdit(path="playground/foo.py", search="", replace="x = 1\n"),
         FileEdit(path="already_flat.py", search="", replace="y = 2\n"),
@@ -35,8 +35,8 @@ def test_materialize_to_dict_partial_search_replace():
 
 
 def test_materialize_to_dict_falls_back_to_replace_when_search_does_not_match():
-    # exactamente el bug real que motivó repair.py: un search que no coincide
-    # no debe reventar el render del prompt, cae a mejor esfuerzo
+    # exactly the real bug that motivated repair.py: a search that doesn't
+    # match must not crash the prompt render, it falls back to best-effort
     base = {"a.py": "unrelated content\n"}
     edits = [FileEdit(path="a.py", search="not present anywhere", replace="fallback content\n")]
     assert _materialize_to_dict(base, edits) == {"a.py": "fallback content\n"}
@@ -69,9 +69,9 @@ def test_edits_signature_changes_with_content():
 
 
 class _FakeRouter:
-    """coder() siempre devuelve la misma respuesta rota -> estancamiento en
-    2 iteraciones (no hace falta agotar max_iterations para probar la
-    escalada a agy). premium_review() es configurable por test."""
+    """coder() always returns the same broken response -> stagnation
+    within 2 iterations (no need to exhaust max_iterations to test
+    escalation to agy). premium_review() is configurable per test."""
 
     def __init__(self, coder_response: str, premium_response: str | None):
         self._coder_response = coder_response
@@ -84,11 +84,11 @@ class _FakeRouter:
     async def premium_review(self, workflow, prompt):
         self.premium_calls += 1
         if self._premium_response is None:
-            raise RuntimeError("agy no disponible en este test")
+            raise RuntimeError("agy unavailable in this test")
         return self._premium_response
 
 
-_BROKEN_JSON = '{"edits": [{"path": "a.py", "replace": "def f(:\\n"}]}'  # error de sintaxis
+_BROKEN_JSON = '{"edits": [{"path": "a.py", "replace": "def f(:\\n"}]}'  # syntax error
 _WORKING_JSON = '{"edits": [{"path": "a.py", "replace": "def f():\\n    return 1\\n"}]}'
 
 
@@ -97,10 +97,10 @@ async def test_repair_loop_succeeds_on_first_tier_coder_attempt(make_config):
     router = _FakeRouter(coder_response=_WORKING_JSON, premium_response=None)
     outcome = await repair_loop(
         router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
-        [FileEdit(path="a.py", search="", replace="broken\n")], "error inicial",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
     )
     assert outcome.success is True
-    assert router.premium_calls == 0  # no hizo falta escalar
+    assert router.premium_calls == 0  # no need to escalate
 
 
 async def test_repair_loop_escalates_to_premium_after_tier_coder_stagnates(make_config):
@@ -108,7 +108,7 @@ async def test_repair_loop_escalates_to_premium_after_tier_coder_stagnates(make_
     router = _FakeRouter(coder_response=_BROKEN_JSON, premium_response=_WORKING_JSON)
     outcome = await repair_loop(
         router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
-        [FileEdit(path="a.py", search="", replace="broken\n")], "error inicial",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
         max_iterations=3,
     )
     assert outcome.success is True
@@ -121,11 +121,11 @@ async def test_repair_loop_fails_when_premium_also_fails(make_config):
     router = _FakeRouter(coder_response=_BROKEN_JSON, premium_response=None)
     outcome = await repair_loop(
         router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
-        [FileEdit(path="a.py", search="", replace="broken\n")], "error inicial",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
         max_iterations=3,
     )
     assert outcome.success is False
-    assert router.premium_calls == 1  # se intentó, pero agy también fallo (o no estaba)
+    assert router.premium_calls == 1  # attempted, but agy also failed (or wasn't available)
 
 
 async def test_repair_loop_skips_premium_when_disabled(make_config):
@@ -133,7 +133,7 @@ async def test_repair_loop_skips_premium_when_disabled(make_config):
     router = _FakeRouter(coder_response=_BROKEN_JSON, premium_response=_WORKING_JSON)
     outcome = await repair_loop(
         router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
-        [FileEdit(path="a.py", search="", replace="broken\n")], "error inicial",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
         max_iterations=3, use_premium_fallback=False,
     )
     assert outcome.success is False

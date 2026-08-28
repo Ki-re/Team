@@ -1,33 +1,33 @@
-"""Subagente de documentación (Fase 12 del plan).
+"""Documentation sub-agent.
 
-Modo opcional de team_feature/team_epic (`update_docs=True, kb_path=...`),
-no una tool propia — mismo patrón que `allow_web_search` en team_ask o
-`selftest` en team_validate. Tras un cambio de código exitoso, decide qué
-archivos existentes del knowledge-base (ver docs/KB_CONVENTION.md —
-frontmatter + INDEX.md, el mismo patrón que la propia memoria de Claude)
-quedaron desactualizados, propone parches con el contrato FileEdit ya
-usado en todo el pipeline, los valida de forma determinista (frontmatter
-sigue siendo YAML válido, sin links rotos) y los aplica vía el Sandbox
-real — igual que cualquier otro edit.
+Optional mode of team_feature/team_epic (`update_docs=True, kb_path=...`),
+not a tool of its own — same pattern as `allow_web_search` on team_ask or
+`selftest` on team_validate. After a successful code change, it decides
+which existing knowledge-base files (see docs/KB_CONVENTION.md —
+frontmatter + INDEX.md, the same pattern Claude's own memory uses) went
+stale, proposes patches with the same FileEdit contract used across the
+whole pipeline, validates them deterministically (frontmatter stays valid
+YAML, no broken links) and applies them through the real Sandbox — just
+like any other edit.
 
-Dos pasadas, no una — encontrado al verificar en vivo, no al diseñar en
-papel: una primera versión mandaba solo el índice (nombre+descripción, sin
-cuerpo) y pedía el `search` exacto directamente, y el modelo no tenía forma
-de copiar texto que nunca vio — fallaba con "el bloque search no aparece
-exactamente una vez" en la primera prueba real contra el gateway. Ahora:
-  1. selección barata sobre el índice (qué archivos, no cómo editarlos).
-  2. por cada archivo seleccionado, una llamada con su contenido REAL,
-     igual que task.py — con un reintento si el search no encaja, mismo
-     patrón de error literal de vuelta que usa el resto del pipeline.
+Two passes, not one — found by verifying live, not by designing on paper:
+a first version only sent the index (name+description, no body) and asked
+for the exact `search` directly, and the model had no way to copy text it
+had never seen — it failed with "the search block doesn't appear exactly
+once" on the first real test against the gateway. Now:
+  1. cheap selection over the index (which files, not how to edit them).
+  2. for each selected file, one call with its REAL content, same as
+     task.py — with a retry if the search doesn't match, the same literal
+     error feedback pattern used across the rest of the pipeline.
 
-Alcance deliberadamente acotado en esta versión: solo actualiza archivos
-YA existentes en el índice. No inventa entradas nuevas — decidir dónde
-vive un doc nuevo y con qué estructura es un juicio que no vale la pena
-automatizar todavía; queda para una iteración futura si hace falta.
+Deliberately narrow scope in this version: it only updates files that are
+ALREADY in the index. It doesn't invent new entries — deciding where a new
+doc should live and how it should be structured is a judgment call not
+worth automating yet; left for a future iteration if needed.
 
-Siempre best-effort: cualquier fallo (JSON roto, sin KB, nada que
-sincronizar) se reporta en el resultado y nunca propaga una excepción —
-nunca debe tumbar el team_feature/team_epic que lo llamó.
+Always best-effort: any failure (broken JSON, no KB, nothing to sync) is
+reported in the result and never propagates as an exception — it must
+never take down the team_feature/team_epic call that invoked it.
 """
 
 from __future__ import annotations
@@ -44,47 +44,47 @@ from team_mcp.providers.router import Router
 _WORKFLOW = "docs_sync"
 _MAX_CHANGED_CONTENT_CHARS = 6000
 _MAX_FILE_EXCERPT_CHARS = 3000
-_MAX_EDIT_ATTEMPTS = 2  # mismo patrón que task.py: un reintento con el error literal basta
+_MAX_EDIT_ATTEMPTS = 2  # same pattern as task.py: one retry with the literal error is enough
 
 _SELECT_PROMPT = """\
-Este cambio de código se acaba de aplicar:
+This code change was just applied:
 
 {change_summary}
 
-Archivos que cambiaron, contenido actual:
+Files that changed, current content:
 {changed_content}
 
-Índice del knowledge-base del proyecto (un archivo por tema, con su
-descripción — NO su contenido completo):
+Project knowledge-base index (one file per topic, with its description —
+NOT its full content):
 {kb_index}
 
-¿Cuáles de estos archivos de documentación probablemente quedaron
-desactualizados por el cambio de arriba? No los edites todavía, solo
-identifica cuáles revisar. Si ninguno aplica, responde con lista vacía.
+Which of these documentation files likely went stale because of the
+change above? Don't edit them yet, just identify which ones to review. If
+none apply, respond with an empty list.
 
-Responde ÚNICAMENTE con JSON:
-{{"affected": ["ruta1.md", "ruta2.md"]}}
+Respond ONLY with JSON:
+{{"affected": ["path1.md", "path2.md"]}}
 """
 
 _EDIT_PROMPT = """\
-Este cambio de código se acaba de aplicar:
+This code change was just applied:
 
 {change_summary}
 
-Contenido ACTUAL completo del archivo de documentación a revisar
+Current FULL content of the documentation file to review
 (`{path}`):
 ---
 {content}
 ---
 {error_context}
-¿Este archivo necesita cambiar por el cambio de código de arriba? Si sí,
-propón como mucho una edición puntual (bloque search/replace exacto y
-mínimo, NO reescribas el archivo entero) — el campo "search" debe
-copiarse LITERALMENTE del contenido de arriba, carácter por carácter. Si
-no necesita cambiar, responde con una lista vacía.
+Does this file need to change because of the change above? If so, propose
+at most one targeted edit (an exact, minimal search/replace block, do NOT
+rewrite the whole file) — the "search" field must be copied LITERALLY
+from the content above, character for character. If it doesn't need to
+change, respond with an empty list.
 
-Responde ÚNICAMENTE con JSON:
-{{"edits": [{{"search": "<fragmento exacto del contenido de arriba>", "replace": "..."}}]}}
+Respond ONLY with JSON:
+{{"edits": [{{"search": "<exact fragment from the content above>", "replace": "..."}}]}}
 """
 
 
@@ -93,26 +93,26 @@ def _validate_kb_edit(kb: Path, edit: FileEdit) -> tuple[bool, str]:
     try:
         target.resolve().relative_to(kb.resolve())
     except ValueError:
-        return False, "ruta fuera del kb_path"
+        return False, "path outside kb_path"
 
     if edit.search == "":
         new_content = edit.replace
     else:
         if not target.exists():
-            return False, "search no vacío para un archivo nuevo/inexistente"
+            return False, "non-empty search for a new/nonexistent file"
         current = target.read_text(encoding="utf-8", errors="replace")
         if current.count(edit.search) != 1:
-            return False, "el bloque search no aparece exactamente una vez"
+            return False, "the search block doesn't appear exactly once"
         new_content = current.replace(edit.search, edit.replace, 1)
 
     if new_content.lstrip().startswith("---"):
         fm, _ = split_frontmatter(new_content)
         if fm is None:
-            return False, "el resultado no tiene frontmatter YAML válido"
+            return False, "the result doesn't have valid YAML frontmatter"
 
     for link in find_local_links(new_content):
         if not (target.parent / link).resolve().exists():
-            return False, f"link roto tras el edit: {link}"
+            return False, f"broken link after the edit: {link}"
 
     return True, ""
 
@@ -120,11 +120,11 @@ def _validate_kb_edit(kb: Path, edit: FileEdit) -> tuple[bool, str]:
 async def _propose_edit_for_file(
     router: Router, kb: Path, rel_path: str, change_summary: str,
 ) -> tuple[FileEdit | None, str]:
-    """Hasta _MAX_EDIT_ATTEMPTS intentos sobre UN archivo, con el error de
-    validación literal realimentado en el reintento — igual que task.py."""
+    """Up to _MAX_EDIT_ATTEMPTS attempts on ONE file, with the literal
+    validation error fed back on retry — same as task.py."""
     target = kb / rel_path
     if not target.exists():
-        return None, f"{rel_path}: en el índice pero no existe en disco"
+        return None, f"{rel_path}: in the index but doesn't exist on disk"
     content = target.read_text(encoding="utf-8", errors="replace")
 
     error_context = ""
@@ -138,20 +138,20 @@ async def _propose_edit_for_file(
             raw = await router.context(_WORKFLOW, prompt)
             data = extract_json_dict(raw)
             edits = data.get("edits", [])
-        except Exception as exc:  # noqa: BLE001 — un archivo caído no debe tumbar el resto
+        except Exception as exc:  # noqa: BLE001 — one downed file shouldn't take down the rest
             last_error = f"{type(exc).__name__}: {exc}"[:200]
-            error_context = f"\nEl intento anterior falló: {last_error}\n"
+            error_context = f"\nThe previous attempt failed: {last_error}\n"
             continue
 
         if not edits:
-            return None, ""  # el modelo decidió que este archivo no necesita cambios
+            return None, ""  # the model decided this file needs no changes
 
         full = FileEdit(path=str(target), search=edits[0].get("search", ""), replace=edits[0]["replace"])
         ok, reason = _validate_kb_edit(kb, full)
         if ok:
             return full, ""
         last_error = reason
-        error_context = f"\nEl intento anterior falló la verificación: {last_error}\n"
+        error_context = f"\nThe previous attempt failed verification: {last_error}\n"
 
     return None, f"{rel_path}: {last_error}"
 
@@ -160,24 +160,24 @@ async def run(
     router: Router, sandbox: Sandbox, *,
     kb_path: str, changed_files: list[str], change_summary: str,
 ) -> dict:
-    """Devuelve un dict compacto — `{"applied": [...], "skipped": [...],
-    "note": "..."}`. Se fusiona en el Manifest del workflow que lo llamó,
-    nunca se expone como su propio Manifest."""
+    """Returns a compact dict — `{"applied": [...], "skipped": [...],
+    "note": "..."}`. Gets merged into the calling workflow's Manifest,
+    never exposed as its own Manifest."""
     kb = Path(kb_path)
     index_file = kb / "INDEX.md"
     if not kb.is_dir() or not index_file.exists():
-        return {"applied": [], "skipped": [], "note": f"KB sin INDEX.md en {kb_path}: nada que sincronizar"}
+        return {"applied": [], "skipped": [], "note": f"KB has no INDEX.md at {kb_path}: nothing to sync"}
 
     entries = list_kb_entries(kb)
     if not entries:
-        return {"applied": [], "skipped": [], "note": "KB sin entradas con frontmatter válido"}
+        return {"applied": [], "skipped": [], "note": "KB has no entries with valid frontmatter"}
 
     changed_content = "\n\n".join(
         f"--- {f} ---\n{Path(f).read_text(encoding='utf-8', errors='replace')[:_MAX_FILE_EXCERPT_CHARS]}"
         for f in changed_files if Path(f).is_file()
     )
     if not changed_content:
-        return {"applied": [], "skipped": [], "note": "ningún archivo cambiado es legible: nada que sincronizar"}
+        return {"applied": [], "skipped": [], "note": "no changed file is readable: nothing to sync"}
 
     known_paths = {e["path"] for e in entries}
     kb_index_text = "\n".join(
@@ -193,14 +193,14 @@ async def run(
         raw = await router.context(_WORKFLOW, select_prompt)
         data = extract_json_dict(raw)
         affected = [p for p in data.get("affected", []) if p in known_paths]
-    except Exception as exc:  # noqa: BLE001 — docs_sync es siempre best-effort
+    except Exception as exc:  # noqa: BLE001 — docs_sync is always best-effort
         return {
             "applied": [], "skipped": [],
-            "note": f"docs_sync (selección) falló: {type(exc).__name__}: {exc}"[:300],
+            "note": f"docs_sync (selection) failed: {type(exc).__name__}: {exc}"[:300],
         }
 
     if not affected:
-        return {"applied": [], "skipped": [], "note": "sin cambios de documentación necesarios"}
+        return {"applied": [], "skipped": [], "note": "no documentation changes needed"}
 
     results = await asyncio.gather(*[
         _propose_edit_for_file(router, kb, rel, change_summary) for rel in affected
@@ -213,9 +213,9 @@ async def run(
         try:
             applied = sandbox.apply_edits(valid_edits)
         except (SandboxViolation, EditConflict) as exc:
-            skipped.append(f"aplicación fallida: {exc}")
+            skipped.append(f"apply failed: {exc}")
 
     return {
         "applied": applied, "skipped": skipped,
-        "note": f"{len(applied)} archivo(s) de KB actualizados, {len(skipped)} omitidos",
+        "note": f"{len(applied)} KB file(s) updated, {len(skipped)} skipped",
     }

@@ -55,7 +55,7 @@ def test_apply_edits_conflict_raises_and_rolls_back_all(make_config, tmp_path):
     ]
     with pytest.raises(EditConflict):
         sandbox.apply_edits(edits)
-    # todo o nada: 'a' no debe quedar modificado aunque su propio edit encajaba
+    # all or nothing: 'a' must not end up modified even though its own edit matched
     assert a.read_text() == "original a\n"
     assert b.read_text() == "original b\n"
 
@@ -76,9 +76,9 @@ def test_apply_edits_dry_run_does_not_persist(make_config, tmp_path):
 
 
 def test_materialize_edits_writes_directly_without_whitelist_check(make_config, tmp_path):
-    # materialize_edits es para scratch dirs de consensus.py: no pasa por
-    # _check_path a propósito, así que debe funcionar aunque `into` no esté
-    # en sandbox_roots.
+    # materialize_edits is for consensus.py's scratch dirs: it deliberately
+    # bypasses _check_path, so it must work even if `into` isn't in
+    # sandbox_roots.
     sandbox = Sandbox(make_config(sandbox_roots=[]))
     scratch = tmp_path / "scratch"
     scratch.mkdir()

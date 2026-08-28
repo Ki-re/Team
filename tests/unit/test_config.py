@@ -36,9 +36,9 @@ def test_bool_uses_default_when_empty():
 
 
 def _isolated_load_config(tmp_path: Path, monkeypatch, env: dict[str, str]):
-    """load_config crea de verdad el directorio padre de ledger_db/cache_db
-    en disco — sin aislar REPO_ROOT, los tests dejarían carpetas reales
-    dentro de este repo. Se apunta a un tmp_path propio en su lugar."""
+    """load_config really creates ledger_db/cache_db's parent directory on
+    disk — without isolating REPO_ROOT, the tests would leave real
+    folders inside this repo. Points to its own tmp_path instead."""
     fake_repo_root = tmp_path / "fake_repo"
     fake_repo_root.mkdir()
     monkeypatch.setattr(config_mod, "REPO_ROOT", fake_repo_root)

@@ -4,9 +4,9 @@ services:
     container_name: team-litellm
     restart: unless-stopped
     ports:
-      # 0.0.0.0 a propósito: la UI/API debe ser accesible desde fuera del
-      # servidor (LAN). No exponer este puerto a Internet sin un reverse
-      # proxy TLS delante.
+      # 0.0.0.0 on purpose: the UI/API must be reachable from outside the
+      # host (LAN). Don't expose this port to the Internet without a TLS
+      # reverse proxy in front of it.
       - "4000:4000"
     volumes:
       - ./litellm.config.yaml:/app/config.yaml:ro
@@ -21,7 +21,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      # la imagen no trae wget/curl; usamos el python del propio venv de la app
+      # the image ships no wget/curl; we use the app's own venv python
       test: ["CMD", "/app/.venv/bin/python3", "-c",
              "import urllib.request as u; u.urlopen('http://localhost:4000/health/liveliness', timeout=4)"]
       interval: 15s
@@ -31,9 +31,9 @@ services:
     deploy:
       resources:
         limits:
-          # 768M no bastaba: el primer arranque (migraciones Prisma +
-          # registro de ~8 modelos + query-engine) llegó a rozar el límite
-          # y estuvo a punto de OOM-kill. 1400M da margen real.
+          # 768M wasn't enough: the first startup (Prisma migrations +
+          # registering ~8 models + query-engine) came close to the limit
+          # and nearly triggered an OOM-kill. 1400M gives real headroom.
           memory: 1400M
 
   postgres:

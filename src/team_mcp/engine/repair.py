@@ -1,18 +1,16 @@
-"""Bucle de reparación acotado (primitiva #4 del plan).
+"""Bounded repair loop (primitive #4 of the plan).
 
-Máximo N iteraciones (default 3). Cada iteración recibe el error LITERAL
-(stack trace, diff de assertion, hallazgo del crítico), nunca "no
-funciona". Temperatura baja (reparar es precisión, no diversidad). Si dos
-iteraciones seguidas producen el mismo diff, se corta la reparación por
-tier-coder — seguir intentando sería ruido.
+Max N iterations (default 3). Each iteration gets the LITERAL error
+(stack trace, assertion diff, critic finding), never "it doesn't work".
+Low temperature (repairing is about precision, not diversity). If two
+consecutive iterations produce the same diff, the tier-coder repair gets
+cut short — continuing would just be noise.
 
-Último recurso antes de rendirse: un intento vía `agy` (tier-premium). No
-es solo el crítico — aquí genera/repara código de verdad. `agy` corre
-sobre la suscripción Google Pro del usuario, con muchísima más cuota que
-el pool gratuito de tier-coder; tiene sentido gastarla precisamente en el
-caso que ya demostró ser duro (2026-08-26: el usuario reportó problemas
-de cuota en Gemini vía API y pidió que las tareas pesadas prioricen agy,
-que sí tiene margen real).
+Last resort before giving up: one attempt via `agy` (tier-premium). Not
+just as critic — here it actually generates/repairs code for real. `agy`
+runs on the operator's own paid subscription, with far more real headroom
+than the free tier-coder pool; it makes sense to spend it precisely on
+the case that already proved hard.
 """
 
 from __future__ import annotations
@@ -30,44 +28,44 @@ from team_mcp.engine.verify import VerifyTarget, verify_candidate
 _MAX_ITERATIONS_DEFAULT = 3
 
 _PROMPT = """\
-Tu implementación anterior falló. Corrígela.
+Your previous implementation failed. Fix it.
 
-Spec original:
+Original spec:
 {spec}
 
-Código actual:
+Current code:
 {code}
 
-Error concreto a resolver:
+Concrete error to resolve:
 {error}
 
-Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "replace": "<contenido COMPLETO del archivo ya corregido>"}}]}}
-Para cada archivo que toques, `replace` debe ser el archivo ENTERO, no un
-fragmento ni un diff — se sobrescribe tal cual. Incluye TODOS los archivos
-mostrados arriba en tu respuesta, aunque no cambies alguno. Usa EXACTAMENTE
-los mismos nombres de archivo que ves arriba en "path" — sin carpetas,
-tal cual aparecen tras "---", aunque el error mencione una ruta distinta.
+Respond ONLY with JSON: {{"edits": [{{"path": "...", "replace": "<FULL content of the already-fixed file>"}}]}}
+For each file you touch, `replace` must be the WHOLE file, not a fragment
+or a diff — it gets overwritten as-is. Include ALL the files shown above
+in your response, even ones you don't change. Use EXACTLY the same file
+names you see above in "path" — no folders, exactly as they appear after
+"---", even if the error mentions a different path.
 """
 
 _PREMIUM_PROMPT = """\
-Varios intentos de reparación automática han fallado con este código.
-Necesito que lo arregles tú directamente — se te pide porque el problema
-ha resultado más difícil de lo normal.
+Several automatic repair attempts have failed on this code. I need you to
+fix it directly — you're being asked because the problem turned out to be
+harder than usual.
 
-Spec original:
+Original spec:
 {spec}
 
-Código actual (último intento, todavía roto):
+Current code (last attempt, still broken):
 {code}
 
-Error concreto a resolver:
+Concrete error to resolve:
 {error}
 
-Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "replace": "<contenido COMPLETO del archivo ya corregido>"}}]}}
-Cada `replace` es el archivo ENTERO, no un diff. Incluye todos los
-archivos mostrados arriba, aunque no cambies alguno. Usa EXACTAMENTE los
-mismos nombres de archivo que ves arriba en "path" — sin carpetas, tal
-cual aparecen tras "---", aunque el error mencione una ruta distinta.
+Respond ONLY with JSON: {{"edits": [{{"path": "...", "replace": "<FULL content of the already-fixed file>"}}]}}
+Each `replace` is the WHOLE file, not a diff. Include all the files shown
+above, even ones you don't change. Use EXACTLY the same file names you
+see above in "path" — no folders, exactly as they appear after "---",
+even if the error mentions a different path.
 """
 
 
@@ -86,11 +84,11 @@ def _edits_signature(edits: list[FileEdit]) -> str:
 
 
 def _materialize_to_dict(base_files: dict[str, str], edits: list[FileEdit]) -> dict[str, str]:
-    """Reconstruye el contenido REAL por archivo tras aplicar `edits` sobre
-    `base_files`, en memoria. Necesario porque `edits` puede contener
-    fragmentos search/replace parciales (no el archivo completo), y el
-    prompt de reparación necesita ver el archivo tal cual quedó, no un
-    recorte — si no, el modelo repara a ciegas."""
+    """Rebuilds the REAL per-file content after applying `edits` on top of
+    `base_files`, in memory. Needed because `edits` may contain partial
+    search/replace fragments (not the whole file), and the repair prompt
+    needs to see the file as it actually ended up, not a snippet — otherwise
+    the model repairs blind."""
     state = dict(base_files)
     for e in edits:
         current = state.get(e.path, "")
@@ -124,15 +122,14 @@ async def _verify_edits_in_scratch(
 
 
 def _force_basename(edits: list[FileEdit]) -> list[FileEdit]:
-    """Los `base_files`/scratch dirs de este módulo viven en "espacio de
-    basename" plano (igual que en workflows/feature.py, ver su propio
-    _force_basename) — pero nada obliga al modelo a devolver un path sin
-    carpetas, y el prompt de reparación suele incluir el error literal
-    (que a menudo SÍ menciona una ruta con subcarpeta). Visto en vivo:
-    un worker de kind=fix hizo justo eso y tumbó la verificación en
-    scratch con un EditConflict "no existe" en vez de un fallo limpio.
-    Se normaliza aquí, en el límite donde el output del modelo entra al
-    espacio interno."""
+    """This module's `base_files`/scratch dirs live in flat "basename
+    space" (same as workflows/feature.py, see its own _force_basename) —
+    but nothing forces the model to return a folder-free path, and the
+    repair prompt usually includes the literal error (which often DOES
+    mention a path with a subfolder). Seen live: a kind=fix worker did
+    exactly that and broke scratch verification with an EditConflict
+    "doesn't exist" instead of a clean failure. Normalized here, at the
+    boundary where the model's output enters the internal space."""
     return [
         e if Path(e.path).name == e.path else e.model_copy(update={"path": Path(e.path).name})
         for e in edits
@@ -141,11 +138,10 @@ def _force_basename(edits: list[FileEdit]) -> list[FileEdit]:
 
 def _parse_repair_edits(raw: str) -> list[FileEdit]:
     data = extract_json_dict(raw)
-    # search se fuerza a "" pase lo que pase: la reparación siempre es
-    # reescritura completa del archivo, nunca un diff. Un search/replace
-    # exacto es justo lo que un modelo pequeño falla a mitad de una
-    # reparación bajo presión (visto en pruebas: "apariciones=0" contra
-    # el código real).
+    # search is forced to "" no matter what: repair is always a full file
+    # rewrite, never a diff. An exact search/replace is exactly what a
+    # small model fails at midway through a repair under pressure (seen in
+    # testing: "occurrences=0" against the real code).
     edits = [FileEdit(path=e["path"], search="", replace=e["replace"]) for e in data["edits"]]
     return _force_basename(edits)
 
@@ -159,7 +155,7 @@ async def _try_premium_repair(
     try:
         raw = await router.premium_review(workflow, prompt)
         new_edits = _parse_repair_edits(raw)
-    except Exception:  # noqa: BLE001 — último recurso: si falla, se rinde, no propaga
+    except Exception:  # noqa: BLE001 — last resort: if it fails, give up, don't propagate
         return None
 
     try:
@@ -203,7 +199,7 @@ async def repair_loop(
         try:
             new_edits = _parse_repair_edits(raw)
         except (ValueError, KeyError, TypeError) as exc:
-            current_error = f"JSON inválido en la reparación: {exc}"
+            current_error = f"invalid JSON in the repair: {exc}"
             attempts.append(RepairAttempt(iteration=i, edits=[], based_on_error=current_error))
             continue
 
@@ -219,7 +215,7 @@ async def repair_loop(
                 timeout_s=timeout_s, candidate_id=f"repair-{i}",
             )
         except EditConflict as exc:
-            current_error = f"conflicto aplicando el edit: {exc}"
+            current_error = f"conflict applying the edit: {exc}"
             attempts.append(RepairAttempt(iteration=i, edits=new_edits, based_on_error=current_error))
             current_edits = new_edits
             continue
@@ -231,7 +227,7 @@ async def repair_loop(
         if result.passes_gate and tests_ok:
             return RepairOutcome(success=True, final_edits=new_edits, iterations=attempts)
 
-        current_error = result.error_output or "gate determinista falló sin detalle"
+        current_error = result.error_output or "deterministic gate failed with no detail"
 
     if use_premium_fallback:
         premium_edits = await _try_premium_repair(
