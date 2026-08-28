@@ -10,7 +10,7 @@ from team_mcp.providers.router import Router
 
 
 def _last_note(ledger: Ledger) -> str:
-    with closing(sqlite3.connect(str(ledger._db_path))) as con:  # noqa: SLF001 — test interno
+    with closing(sqlite3.connect(str(ledger._db_path))) as con:
         row = con.execute("SELECT note FROM spend ORDER BY id DESC LIMIT 1").fetchone()
         return row[0]
 

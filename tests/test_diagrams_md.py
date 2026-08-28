@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DIAGRAMS_MD = REPO_ROOT / "docs" / "DIAGRAMS.md"
 

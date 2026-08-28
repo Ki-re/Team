@@ -1,8 +1,25 @@
 from __future__ import annotations
 
-from team_mcp.engine.repair import _edits_signature, _materialize_to_dict, repair_loop
+from team_mcp.engine.repair import (
+    _edits_signature,
+    _force_basename,
+    _materialize_to_dict,
+    repair_loop,
+)
 from team_mcp.engine.sandbox import Sandbox
 from team_mcp.engine.schemas import FileEdit
+
+
+def test_force_basename_strips_directories_from_model_output():
+    # mismo bug real que en feature.py: un worker de reparacion copio una
+    # ruta con subcarpeta del error literal en vez del basename, lo que
+    # tumbaba la verificacion en scratch con un EditConflict "no existe".
+    edits = [
+        FileEdit(path="playground/foo.py", search="", replace="x = 1\n"),
+        FileEdit(path="already_flat.py", search="", replace="y = 2\n"),
+    ]
+    result = _force_basename(edits)
+    assert [e.path for e in result] == ["foo.py", "already_flat.py"]
 
 
 def test_materialize_to_dict_full_file_replace():

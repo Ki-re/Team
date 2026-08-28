@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from team_mcp.engine.schemas import FileEdit
 from team_mcp.engine.sandbox import Sandbox
+from team_mcp.engine.schemas import FileEdit
 from team_mcp.workflows import docs_sync
 from team_mcp.workflows.docs_sync import _validate_kb_edit
 

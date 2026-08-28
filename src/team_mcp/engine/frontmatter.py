@@ -92,7 +92,9 @@ def check_dangling_links(kb_path: Path) -> list[str]:
 def check_stale(entries: list[dict], max_age_days: int = 180) -> list[str]:
     """Entradas sin `last_verified` o más viejas que max_age_days."""
     stale = []
-    cutoff = _dt.date.today() - _dt.timedelta(days=max_age_days)
+    # una staleness check de ~180 días no necesita tz-awareness: la hora
+    # local del día actual es más que suficiente precisión aquí.
+    cutoff = _dt.datetime.now().date() - _dt.timedelta(days=max_age_days)  # noqa: DTZ005
     for e in entries:
         raw = e.get("last_verified")
         if not raw:

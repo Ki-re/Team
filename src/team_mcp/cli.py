@@ -11,6 +11,8 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Callable
+from typing import Any
 
 from team_mcp.config import load_config, load_env
 from team_mcp.engine.ledger import Ledger
@@ -30,7 +32,9 @@ async def _probe_gateway(router: Router) -> None:
 async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwargs: dict) -> None:
     from team_mcp.workflows import ask, epic, feature, task, validate
 
-    handlers = {
+    # cada workflow.run tiene una firma distinta (kwargs distintos) — Any es
+    # deliberado aquí, es un despachador dinámico por diseño, no un olvido.
+    handlers: dict[str, Callable[..., Any]] = {
         "team_task": task.run,
         "team_feature": feature.run,
         "team_epic": epic.run,
@@ -51,7 +55,7 @@ def main() -> None:
     # cualquier carácter Unicode (visto crashear con "≈" contra la consola
     # cp1252 de Windows) — la consola por defecto no lo soporta, forzamos
     # utf-8 con fallback seguro en vez de confiar en la codificación del SO.
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
     parser = argparse.ArgumentParser(prog="team_mcp.cli")
     sub = parser.add_subparsers(dest="cmd", required=True)

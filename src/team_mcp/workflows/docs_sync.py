@@ -36,7 +36,7 @@ import asyncio
 from pathlib import Path
 
 from team_mcp.engine.frontmatter import find_local_links, list_kb_entries, split_frontmatter
-from team_mcp.engine.jsonio import extract_json
+from team_mcp.engine.jsonio import extract_json_dict
 from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
 from team_mcp.engine.schemas import FileEdit
 from team_mcp.providers.router import Router
@@ -136,7 +136,7 @@ async def _propose_edit_for_file(
         )
         try:
             raw = await router.context(_WORKFLOW, prompt)
-            data = extract_json(raw)
+            data = extract_json_dict(raw)
             edits = data.get("edits", [])
         except Exception as exc:  # noqa: BLE001 — un archivo caído no debe tumbar el resto
             last_error = f"{type(exc).__name__}: {exc}"[:200]
@@ -191,7 +191,7 @@ async def run(
 
     try:
         raw = await router.context(_WORKFLOW, select_prompt)
-        data = extract_json(raw)
+        data = extract_json_dict(raw)
         affected = [p for p in data.get("affected", []) if p in known_paths]
     except Exception as exc:  # noqa: BLE001 — docs_sync es siempre best-effort
         return {

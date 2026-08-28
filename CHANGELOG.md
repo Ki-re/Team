@@ -6,6 +6,51 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 
 ## [Unreleased]
 
+### Fixed
+- **Auditoría autónoma del trabajo de esta sesión** (a petición explícita:
+  "check your previous work for mistakes... fix them, don't wait for my
+  order"). `mypy` no se había corrido nunca en serio pese a estar en las
+  dev deps: 19 errores reales, todos corregidos — la mayoría eran
+  `extract_json()` (devuelve `dict | list`) usado como si siempre fuera
+  `dict` sin narrowing; se añadió `extract_json_dict()` (falla con un
+  `JsonExtractionError` claro si el modelo devuelve una lista donde se
+  esperaba un objeto, en vez del `TypeError` críptico de antes) y se migró
+  cada sitio que asumía `dict`. El resto eran variables reutilizadas con
+  tipos distintos dentro del mismo scope de función (`report`, `winner`,
+  `c`) — inofensivo en tiempo de ejecución pero frágil; renombradas.
+  `ruff check` tampoco estaba limpio (noqa obsoletos, imports desordenados)
+  — arreglado también, `ruff`/`mypy`/pytest quedan en verde a la vez.
+- **Bug real encontrado verificando en vivo tras el cambio de mypy** (no
+  causado por él): `engine/repair.py::_parse_repair_edits` y varios sitios
+  de `workflows/feature.py` construían `FileEdit(path=...)` directamente
+  del campo `path` que devuelve el modelo, sin normalizar — un worker de
+  `kind=fix` copió una ruta con subcarpeta del `repro_command` (que sí la
+  mencionaba) en vez de usar el basename plano que espera el "espacio de
+  basename" interno del pipeline, y la llamada entera reventó con
+  `EditConflict: ...no existe...` sin manifiesto, la misma clase de fallo
+  ya cerrada para consensus.py en la Fase 14. Añadido `_force_basename()`
+  (en `feature.py` y `repair.py`) que fuerza el basename en el límite
+  donde el output del modelo entra al espacio interno, más una instrucción
+  explícita "sin carpetas" en los prompts de `fix`/`refactor`/reparación
+  que no la tenían (`_IMPLEMENT_PROMPT` sí, desde el principio). Reproducido
+  y verificado en vivo dos veces: el escenario que reventaba ahora falla
+  limpio con un manifiesto claro (cuando el `repro_command` referencia una
+  ruta que no existe en el scratch dir aplanado — limitación real y
+  todavía no resuelta, documentada en el código, ver más abajo) y el
+  escenario equivalente con un `repro_command` de basename plano corrige
+  el bug correctamente de principio a fin.
+
+### Known limitations (documentado, no arreglado)
+- `kind=fix`: el `repro_command` corre con cwd en un scratch dir que solo
+  contiene basenames planos, nunca la estructura real de subcarpetas de
+  `target_paths`. Un `repro_command` que referencia una ruta con
+  subcarpeta tal cual la vería el usuario (`pytest playground/test_x.py`
+  en vez de `pytest test_x.py`) falla con "file or directory not found"
+  aunque el fix sea correcto. El arreglo requiere que `_run_fix` preserve
+  rutas reales en sus scratch dirs en vez de aplanarlas — toca la
+  convención compartida con `kind=new`/`kind=refactor`, no se ha hecho sin
+  supervisión. Documentado en `_run_repro` (`feature.py`).
+
 ## [1.1.0] - 2026-08-28
 
 Segunda pasada de preparación para publicación: el repo pasa de "privado

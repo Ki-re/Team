@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from team_mcp.workflows.validate import _check_kb_frontmatter, _check_secrets, _check_syntax, _collect_py_files
+from team_mcp.workflows.validate import (
+    _check_kb_frontmatter,
+    _check_secrets,
+    _check_syntax,
+    _collect_py_files,
+)
 
 
 def test_collect_py_files_single_file(tmp_path: Path):

@@ -16,7 +16,7 @@ from __future__ import annotations
 import ast
 import time
 
-from team_mcp.engine.jsonio import extract_json
+from team_mcp.engine.jsonio import extract_json_dict
 from team_mcp.providers.router import Router
 
 _WORKFLOW = "selftest"
@@ -41,7 +41,7 @@ async def _check_coder(router: Router) -> dict:
     )
     try:
         raw = await router.coder(_WORKFLOW, prompt, temperature=0.3)
-        data = extract_json(raw)
+        data = extract_json_dict(raw)
         code = data["code"]
         ast.parse(code)
         ok, detail = True, ""

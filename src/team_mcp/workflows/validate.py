@@ -19,7 +19,12 @@ from pathlib import Path
 
 from team_mcp.config import Config
 from team_mcp.engine.critic import review as critic_review
-from team_mcp.engine.frontmatter import check_dangling_links, check_stale, list_kb_entries, split_frontmatter
+from team_mcp.engine.frontmatter import (
+    check_dangling_links,
+    check_stale,
+    list_kb_entries,
+    split_frontmatter,
+)
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.schemas import FileEdit, Manifest
 from team_mcp.providers.router import Router
@@ -208,14 +213,14 @@ async def run(
                 FileEdit(path=str(f.relative_to(scope_path.parent if scope_path.is_file() else scope_path)), search="", replace=f.read_text(encoding="utf-8", errors="replace"))
                 for f in py_files[:20]  # tope: revisión de arquitectura no necesita todo un repo enorme
             ]
-            report = await critic_review(
+            critic_report = await critic_review(
                 router, _WORKFLOW,
                 f"Evalúa si la arquitectura del código coincide con esta spec:\n{spec_original}",
                 edits,
                 focus="Enfócate SOLO en arquitectura: ¿la estructura del código refleja lo que pide la spec? ¿faltan piezas? ¿hay algo que contradiga el diseño pedido?",
             )
-            if report.findings:
-                lines = [f"[{f.severity}] {f.file}: {f.claim}" for f in report.findings[:10]]
+            if critic_report.findings:
+                lines = [f"[{f.severity}] {f.file}: {f.claim}" for f in critic_report.findings[:10]]
                 warnings.append("revisión de arquitectura:\n" + "\n".join(lines))
         except Exception as exc:  # noqa: BLE001 — informativo, no debe tumbar el validate
             warnings.append(f"revisión de arquitectura no disponible: {exc}")

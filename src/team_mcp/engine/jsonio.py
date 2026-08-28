@@ -46,7 +46,7 @@ def extract_json(raw: str) -> dict | list:
     # (visto fallar en tests). Por eso no basta con "el más largo" a ciegas:
     # se intenta parsear cada candidato y solo se compara longitud entre los
     # que de verdad son JSON válido.
-    parsed: list[tuple[str, object]] = []
+    parsed: list[tuple[str, dict | list]] = []
     last_error: Exception | None = None
     for text in candidates:
         try:
@@ -61,6 +61,20 @@ def extract_json(raw: str) -> dict | list:
 
     _, best_value = max(parsed, key=lambda pair: len(pair[0]))
     return best_value
+
+
+def extract_json_dict(raw: str) -> dict:
+    """Como extract_json, pero exige que el resultado sea un objeto, no una
+    lista. La mayoría de los prompts del proyecto piden un objeto con
+    campos concretos (p.ej. {"edits": [...]}) — sin esto, un worker que
+    devuelve una lista suelta producía un TypeError críptico más adelante
+    (`list indices must be integers, not str`) en vez de un error claro."""
+    data = extract_json(raw)
+    if not isinstance(data, dict):
+        raise JsonExtractionError(
+            f"se esperaba un objeto JSON, se obtuvo una lista: {raw[:200]}"
+        )
+    return data
 
 
 async def parse_or_repair(raw: str, schema: type[T], router, workflow: str) -> T:

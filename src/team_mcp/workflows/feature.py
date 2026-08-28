@@ -28,7 +28,7 @@ from pathlib import Path
 from team_mcp.config import Config
 from team_mcp.engine.consensus import ConsensusCandidate, run_consensus
 from team_mcp.engine.critic import review as critic_review
-from team_mcp.engine.jsonio import extract_json
+from team_mcp.engine.jsonio import extract_json_dict
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.repair import repair_loop
 from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
@@ -73,6 +73,9 @@ rompe. Cubre las rutas principales que uses/veas ejercitadas por el código.
 Archivos:
 {content}
 
+Usa EXACTAMENTE los mismos nombres de archivo que ves arriba en el campo
+"path" — sin carpetas, tal cual aparecen tras "---".
+
 Responde ÚNICAMENTE con JSON:
 {{"test_edits": [{{"path": "test_characterization.py", "search": "", "replace": "..."}}]}}
 """
@@ -85,6 +88,9 @@ Objetivo del refactor: {goal}
 
 Archivos:
 {content}
+
+Usa EXACTAMENTE los mismos nombres de archivo que ves arriba en el campo
+"path" de tus edits — sin carpetas, tal cual aparecen tras "---".
 
 Responde ÚNICAMENTE con JSON:
 {{"edits": [{{"path": "...", "search": "...", "replace": "..."}}], "rationale": "<1 frase>"}}
@@ -112,6 +118,11 @@ Descripción del bug: {bug}
 
 Archivos:
 {content}
+
+Usa EXACTAMENTE los mismos nombres de archivo que ves arriba en el campo
+"path" de tus edits — sin carpetas, tal cual aparecen tras "---". Aunque
+el repro_command o la descripción mencionen una ruta con subcarpetas
+(p.ej. "src/foo.py"), en "path" va SOLO el nombre de archivo ("foo.py").
 
 Responde ÚNICAMENTE con JSON:
 {{"edits": [{{"path": "...", "search": "...", "replace": "..."}}], "rationale": "<1 frase>"}}
@@ -141,6 +152,23 @@ async def _read_base_files(target_paths: list[str]) -> dict[str, str]:
         p = Path(raw)
         base[p.name] = p.read_text(encoding="utf-8") if p.exists() else ""
     return base
+
+
+def _force_basename(edits: list[FileEdit]) -> list[FileEdit]:
+    """El pipeline interno (consenso, scratch dirs) vive en "espacio de
+    basename" plano — pero nada obliga al modelo a respetarlo, y en vivo
+    se vio un worker de kind=fix devolver un `path` con carpetas (el
+    repro_command mencionaba una subcarpeta, el modelo lo copió), lo que
+    rompía la verificación en scratch con un EditConflict "no existe"
+    ANTES de llegar a _to_target_paths (esa función sí normaliza, pero
+    solo se llama justo antes de la escritura final, no durante la
+    verificación intermedia). Se fuerza el basename aquí, en el límite
+    donde el output del modelo entra al espacio interno, en vez de confiar
+    en que el modelo respete la convención."""
+    return [
+        e if Path(e.path).name == e.path else e.model_copy(update={"path": Path(e.path).name})
+        for e in edits
+    ]
 
 
 def _to_target_paths(edits: list[FileEdit], target_paths: list[str]) -> list[FileEdit]:
@@ -176,7 +204,21 @@ async def _maybe_sync_docs(
 
 async def _run_repro(cmd: list[str], workdir: Path, timeout_s: float = 60.0) -> tuple[bool, str]:
     """Ejecuta el repro_command del usuario tal cual, sin interpretarlo como
-    pytest. El criterio de aceptación es el código de salida: 0 = pasa."""
+    pytest. El criterio de aceptación es el código de salida: 0 = pasa.
+
+    LIMITACIÓN CONOCIDA (encontrada en vivo, no arreglada todavía): `cmd`
+    corre con cwd=workdir, y workdir (baseline_dir/scratch en _run_fix) solo
+    contiene los archivos en "espacio de basename" plano — nunca la
+    estructura real de subcarpetas de target_paths. Un repro_command que
+    referencia una ruta con subcarpeta tal cual la vería el usuario (p.ej.
+    `pytest playground/test_x.py`, en vez de `pytest test_x.py`) falla con
+    "file or directory not found" aunque el fix en sí sea correcto — no es
+    un fallo del fix, es que el repro_command no encuentra el archivo en el
+    layout aplanado. El arreglo correcto sería que _run_fix materialice sus
+    scratch dirs preservando las rutas reales (no solo basenames), pero eso
+    exige tocar la convención de "espacio de basename" que comparten
+    _run_new/_run_refactor/_run_fix — deliberadamente no se ha hecho sin
+    supervisión; requiere diseño y verificación en vivo cuidadosos."""
     import subprocess
 
     def _sync_run() -> tuple[bool, str]:
@@ -222,9 +264,9 @@ async def _generate_candidate(
     prompt = _IMPLEMENT_PROMPT.format(spec=spec, content=content)
     try:
         raw = await router.coder(_WORKFLOW, prompt, temperature=0.8)
-        data = extract_json(raw)
-        edits = [FileEdit(**e) for e in data["edits"]]
-        test_edits = [FileEdit(**e) for e in data.get("test_edits", [])]
+        data = extract_json_dict(raw)
+        edits = _force_basename([FileEdit(**e) for e in data["edits"]])
+        test_edits = _force_basename([FileEdit(**e) for e in data.get("test_edits", [])])
     except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
         # antes se descartaba el motivo (timeout, 429, JSON roto, campo
         # faltante quedaban todos indistinguibles como "None") — obligaba a
@@ -354,9 +396,9 @@ async def _run_refactor(
     for _ in range(_MAX_CHAR_TEST_ATTEMPTS):
         try:
             raw = await router.coder(_WORKFLOW, _CHARACTERIZE_PROMPT.format(content=content), temperature=0.3)
-            data = extract_json(raw)
-            candidate = [FileEdit(**e) for e in data["test_edits"]]
-        except Exception as exc:  # noqa: BLE001, S112 — reintentamos, no propagamos
+            data = extract_json_dict(raw)
+            candidate = _force_basename([FileEdit(**e) for e in data["test_edits"]])
+        except Exception as exc:  # noqa: BLE001 — reintentamos, no propagamos
             char_last_error = f"{type(exc).__name__}: {exc}"[:300]
             continue
         result = await _verify_in_scratch(
@@ -382,8 +424,8 @@ async def _run_refactor(
     async def _one(worker_id: str) -> tuple[ConsensusCandidate | None, str | None]:
         try:
             raw = await router.coder(_WORKFLOW, _REFACTOR_PROMPT.format(goal=spec, content=content), temperature=0.7)
-            data = extract_json(raw)
-            edits = [FileEdit(**e) for e in data["edits"]]
+            data = extract_json_dict(raw)
+            edits = _force_basename([FileEdit(**e) for e in data["edits"]])
         except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
             return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
         return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[]), None
@@ -492,10 +534,10 @@ async def _run_fix(
 
     with tempfile.TemporaryDirectory(prefix="team_fix_baseline_") as tmp:
         baseline_dir = Path(tmp)
-        for rel, c in base_files.items():
+        for rel, file_content in base_files.items():
             p = baseline_dir / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(c, encoding="utf-8")
+            p.write_text(file_content, encoding="utf-8")
         baseline_ok, baseline_output = await _run_repro(repro_argv, baseline_dir)
 
     if baseline_ok:
@@ -511,10 +553,10 @@ async def _run_fix(
     localization = "(localización automática no disponible)"
     try:
         raw = await router.context(_WORKFLOW, _LOCALIZE_PROMPT.format(bug=spec, content=content))
-        data = extract_json(raw)
+        data = extract_json_dict(raw)
         localization = "Localización sugerida: " + "; ".join(
-            f"{c.get('path')}:{c.get('line')} — {c.get('justification', '')}"
-            for c in data.get("candidates", [])
+            f"{cand.get('path')}:{cand.get('line')} — {cand.get('justification', '')}"
+            for cand in data.get("candidates", [])
         )
     except Exception:  # noqa: BLE001, S110 — puramente informativo, no bloquea el fix
         pass
@@ -525,8 +567,8 @@ async def _run_fix(
         )
         try:
             raw = await router.coder(_WORKFLOW, prompt, temperature=0.6)
-            data = extract_json(raw)
-            edits = [FileEdit(**e) for e in data["edits"]]
+            data = extract_json_dict(raw)
+            edits = _force_basename([FileEdit(**e) for e in data["edits"]])
         except Exception as exc:  # noqa: BLE001 — un worker caído no debe tumbar el fan-out
             return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
         return ConsensusCandidate(id=worker_id, model="tier-coder", edits=edits, test_edits=[]), None
@@ -544,10 +586,10 @@ async def _run_fix(
     async def _check(edits: list[FileEdit]) -> tuple[bool, str]:
         with tempfile.TemporaryDirectory(prefix="team_fix_") as tmp:
             scratch = Path(tmp)
-            for rel, c in base_files.items():
+            for rel, file_content in base_files.items():
                 p = scratch / rel
                 p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text(c, encoding="utf-8")
+                p.write_text(file_content, encoding="utf-8")
             sandbox.materialize_edits(edits, scratch)
             return await _run_repro(repro_argv, scratch)
 

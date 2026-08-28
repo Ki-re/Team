@@ -22,7 +22,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from team_mcp.engine.jsonio import extract_json
+from team_mcp.engine.jsonio import extract_json_dict
 from team_mcp.engine.sandbox import EditConflict, Sandbox
 from team_mcp.engine.schemas import FileEdit, RepairAttempt
 from team_mcp.engine.verify import VerifyTarget, verify_candidate
@@ -44,7 +44,9 @@ Error concreto a resolver:
 Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "replace": "<contenido COMPLETO del archivo ya corregido>"}}]}}
 Para cada archivo que toques, `replace` debe ser el archivo ENTERO, no un
 fragmento ni un diff — se sobrescribe tal cual. Incluye TODOS los archivos
-mostrados arriba en tu respuesta, aunque no cambies alguno.
+mostrados arriba en tu respuesta, aunque no cambies alguno. Usa EXACTAMENTE
+los mismos nombres de archivo que ves arriba en "path" — sin carpetas,
+tal cual aparecen tras "---", aunque el error mencione una ruta distinta.
 """
 
 _PREMIUM_PROMPT = """\
@@ -63,7 +65,9 @@ Error concreto a resolver:
 
 Responde ÚNICAMENTE con JSON: {{"edits": [{{"path": "...", "replace": "<contenido COMPLETO del archivo ya corregido>"}}]}}
 Cada `replace` es el archivo ENTERO, no un diff. Incluye todos los
-archivos mostrados arriba, aunque no cambies alguno.
+archivos mostrados arriba, aunque no cambies alguno. Usa EXACTAMENTE los
+mismos nombres de archivo que ves arriba en "path" — sin carpetas, tal
+cual aparecen tras "---", aunque el error mencione una ruta distinta.
 """
 
 
@@ -119,14 +123,31 @@ async def _verify_edits_in_scratch(
         ))
 
 
+def _force_basename(edits: list[FileEdit]) -> list[FileEdit]:
+    """Los `base_files`/scratch dirs de este módulo viven en "espacio de
+    basename" plano (igual que en workflows/feature.py, ver su propio
+    _force_basename) — pero nada obliga al modelo a devolver un path sin
+    carpetas, y el prompt de reparación suele incluir el error literal
+    (que a menudo SÍ menciona una ruta con subcarpeta). Visto en vivo:
+    un worker de kind=fix hizo justo eso y tumbó la verificación en
+    scratch con un EditConflict "no existe" en vez de un fallo limpio.
+    Se normaliza aquí, en el límite donde el output del modelo entra al
+    espacio interno."""
+    return [
+        e if Path(e.path).name == e.path else e.model_copy(update={"path": Path(e.path).name})
+        for e in edits
+    ]
+
+
 def _parse_repair_edits(raw: str) -> list[FileEdit]:
-    data = extract_json(raw)
+    data = extract_json_dict(raw)
     # search se fuerza a "" pase lo que pase: la reparación siempre es
     # reescritura completa del archivo, nunca un diff. Un search/replace
     # exacto es justo lo que un modelo pequeño falla a mitad de una
     # reparación bajo presión (visto en pruebas: "apariciones=0" contra
     # el código real).
-    return [FileEdit(path=e["path"], search="", replace=e["replace"]) for e in data["edits"]]
+    edits = [FileEdit(path=e["path"], search="", replace=e["replace"]) for e in data["edits"]]
+    return _force_basename(edits)
 
 
 async def _try_premium_repair(
