@@ -7,6 +7,25 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 ## [Unreleased]
 
 ### Added
+- Live gateway roster: 7 new free-tier model entries added via LiteLLM's
+  admin API (`store_model_in_db: true`, no redeploy needed), each
+  verified with a real completion against the provider's own API first
+  and then again through the proxy — `tier-fast` gains `groq/qwen3.8-27b`
+  and `openrouter/liquid/lfm-2.5-2.6b:free`; `tier-coder` gains
+  `mistral/devstral-latest` (a coding-agent-specific model, same
+  "Experiment" key already used for codestral) and `groq/openai/gpt-oss-120b`
+  (same Groq key as the 20b already in the pool, its own independent
+  rate-limit bucket); `tier-context` gains `gemini-3.1-flash-lite-preview`
+  and `gemini-3-flash-preview` (separate model ids from the stable
+  versions already in the pool, so likely separate quota buckets — worth
+  watching via `selftest`) and `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`
+  (1M context). Not mirrored into `deploy/litellm.config.yaml`, which
+  stays the deliberately lean starting template from the 1.1.0 trim
+  (the live instance has never been a 1:1 mirror of that file since
+  then). `thinkingmachines/inkling:free` was evaluated and rejected: it
+  refuses plain chat-completions calls, only usable from an "agentic
+  harness." Cerebras re-checked and still hard-402s (unchanged since
+  Phase 9); `GEMINI_PRO_API_KEY` in `deploy/.env` confirmed empty/unused.
 - README: a "Why LiteLLM" section explaining the provider-indirection
   rationale (one API shape, many swappable providers/models behind it), a
   table of the free-tier providers this project actually uses (Groq,
