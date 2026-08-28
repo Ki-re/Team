@@ -14,4 +14,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
+      - run: ruff check src/ tests/
+      - run: mypy src/team_mcp --ignore-missing-imports
       - run: pytest tests/ -q

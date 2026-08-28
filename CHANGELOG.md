@@ -6,6 +6,12 @@ usa [SemVer](https://semver.org/) para las versiones etiquetadas en git.
 
 ## [Unreleased]
 
+### Changed
+- `.github/workflows/tests.yml`: CI corre ahora `ruff check` y `mypy`
+  además de `pytest` — la razón de fondo por la que ambos llevaban toda la
+  sesión sin pasar de verdad (ver más abajo) es que nada los hacía
+  obligatorios en cada push.
+
 ### Fixed
 - **Auditoría autónoma del trabajo de esta sesión** (a petición explícita:
   "check your previous work for mistakes... fix them, don't wait for my
