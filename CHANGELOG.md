@@ -6,7 +6,35 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Added
+- README: a "Why LiteLLM" section explaining the provider-indirection
+  rationale (one API shape, many swappable providers/models behind it), a
+  table of the free-tier providers this project actually uses (Groq,
+  OpenRouter, Google AI Studio, Mistral), a disclaimer about free-tier
+  volatility, and a note that self-hosted OpenAI-compatible endpoints
+  (vLLM, Ollama, etc.) plug into the same four tiers with no code changes.
+- README: a "The premium tier: why `agy`, and how to swap it" section
+  documenting the new `TEAM_AGY_CLI_ARGS` mechanism (see below) with
+  concrete examples for Codex CLI and `claude -p`.
+- `providers/agy.py`: `TEAM_AGY_CLI_ARGS`, a pipe-separated argv template
+  (`"{prompt}"` substituted as one literal argv element, never
+  shell-interpolated) that lets a different subscription CLI be swapped
+  in for `agy` via `.env` alone in the common case, no fork needed.
+  Defaults to `agy`'s own exact invocation, so existing setups are
+  unaffected unless this is set explicitly.
+
 ### Changed
+- README and the two main diagrams (`architecture.svg`,
+  `team_feature_pipeline.svg`) now frame the orchestrator generically ("a
+  coding agent" — Claude, Codex, Hermes, or anything else that speaks
+  MCP) instead of assuming Claude specifically, while keeping the
+  concrete, tested Claude Code registration steps as the documented path.
+- Full-repo translation: every remaining Spanish comment, docstring,
+  prompt template, and error string across `src/`, `tests/`, and this
+  CHANGELOG is now English. LLM-facing prompts (`feature.py`,
+  `repair.py`, `docs_sync.py`, `ask.py`) were re-verified live against
+  the real gateway after translation, not just syntax-checked — a prompt
+  wording change is a behavioral change, not a cosmetic one.
 - `.github/workflows/tests.yml`: CI now runs `ruff check` and `mypy` in
   addition to `pytest` — the underlying reason both had gone the whole
   session without genuinely passing (see below) is that nothing made them
@@ -45,6 +73,17 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
   flattened scratch dir — a real, still-unresolved limitation, documented
   in the code, see below), and the equivalent scenario with a flat-
   basename `repro_command` correctly fixes the bug end to end.
+
+### Security
+- Rewrote the entire git history (`git filter-repo`) to scrub every
+  remaining occurrence of the author's real private gateway IP from past
+  commits — file content and commit messages both — after finding the
+  forward-only anonymization from the 1.1.0 cycle hadn't touched history.
+  The repo was private with 0 forks/0 stars at the time, confirmed
+  immediately before rewriting; a full bundle backup was taken first, and
+  a fresh mirror clone of the pushed remote afterward confirmed 0 matches
+  across all refs. Tags (`v1.0.0`, `v1.1.0`) were preserved pointing at
+  their rewritten commits, and CI passed on the force-pushed history.
 
 ### Known limitations (documented, not fixed)
 - `kind=fix`: the `repro_command` runs with its cwd in a scratch dir that
