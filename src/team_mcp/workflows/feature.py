@@ -154,6 +154,23 @@ async def _read_base_files(target_paths: list[str]) -> dict[str, str]:
     return base
 
 
+def _validate_target_paths(target_paths: list[str]) -> str | None:
+    """Returns an error message if any target_path is a directory, else
+    None. `Path.exists()` is true for directories too, so
+    `_read_base_files` used to hand them straight to `read_text()` —
+    which raises (PermissionError on Windows, IsADirectoryError on
+    POSIX), uncaught anywhere upstream, crashing the whole tool call with
+    no Manifest at all. Found investigating a report of team_feature
+    "erroring out on every directory-shaped target_paths call". Checked
+    once, up front, for all four `kind`s — a directory target is a
+    caller mistake worth reporting clearly, not something to silently
+    reinterpret as an empty new file."""
+    dirs = [p for p in target_paths if Path(p).is_dir()]
+    if dirs:
+        return f"target_paths must be files, not directories: {dirs}"
+    return None
+
+
 def _force_basename(edits: list[FileEdit]) -> list[FileEdit]:
     """The internal pipeline (consensus, scratch dirs) lives in a flat
     "basename space" — but nothing forces the model to respect it, and in
@@ -301,27 +318,50 @@ async def _run_new(
     )
 
     if consensus.winner_id is None:
-        return Manifest(
-            tool=_WORKFLOW, kind=FeatureKind.new, tests_status="red",
-            summary=(
-                f"no clear consensus winner among {len(candidates)} candidates "
-                f"(scores={consensus.scores}). Needs manual synthesis or team_epic."
-            ),
-            dry_run=config.dry_run,
+        # no candidate satisfied even one other candidate's tests — before
+        # giving up, give the premium tier a shot at synthesis, the same
+        # rescue _run_refactor/_run_fix already fall back to when THEIR
+        # own winner-selection comes up empty. consensus.py has computed
+        # exactly this signal (escalate_to_premium) since it was written,
+        # but nothing ever read it — found investigating a report of
+        # team_feature returning "no consensus" with no attempt at the
+        # premium-tier rescue the design always intended for this case.
+        first = candidates[0]
+        outcome = await repair_loop(
+            router, _WORKFLOW, sandbox, base_files, spec, first.edits + first.test_edits,
+            f"no consensus: {len(candidates)} candidates disagreed enough that none "
+            f"passed even one other candidate's tests (scores={consensus.scores})",
+            test_command=_TEST_COMMAND,
         )
+        if not outcome.success:
+            return Manifest(
+                tool=_WORKFLOW, kind=FeatureKind.new, tests_status="red",
+                summary=(
+                    f"no consensus among {len(candidates)} candidates (scores={consensus.scores}), "
+                    f"and the premium-tier rescue also failed "
+                    f"({'stagnated' if outcome.stagnated else 'did not converge'}): {outcome.last_error[:300]}"
+                ),
+                dry_run=config.dry_run,
+            )
+        edits = outcome.final_edits
+        tests_ok = True  # repair_loop already verified this (test_command=_TEST_COMMAND)
+        blocking: list[CriticFinding] = []
+        winner_label = "premium-rescue"
+    else:
+        winner = next(c for c in candidates if c.id == consensus.winner_id)
+        edits = winner.edits + winner.test_edits
+        winner_label = f"{winner.id}, score={consensus.scores.get(winner.id, 0):.2f}"
 
-    winner = next(c for c in candidates if c.id == consensus.winner_id)
-    edits = winner.edits + winner.test_edits
+        critic_report = await critic_review(router, _WORKFLOW, spec, winner.edits)
+        blocking = critic_report.blocking(Severity.high)
 
-    critic_report = await critic_review(router, _WORKFLOW, spec, winner.edits)
-    blocking = critic_report.blocking(Severity.high)
+        tests_ok = True
+        if consensus.matrix:
+            self_cell = next(
+                (c for c in consensus.matrix if c.impl_id == winner.id and c.tests_id == winner.id), None
+            )
+            tests_ok = self_cell is not None and self_cell.total > 0 and self_cell.passed == self_cell.total
 
-    tests_ok = True
-    if consensus.matrix:
-        self_cell = next(
-            (c for c in consensus.matrix if c.impl_id == winner.id and c.tests_id == winner.id), None
-        )
-        tests_ok = self_cell is not None and self_cell.total > 0 and self_cell.passed == self_cell.total
     provider_used = {"tier_premium": "agy" if router.premium.last_used != "fallback" else "fallback"}
 
     if not tests_ok or blocking:
@@ -367,8 +407,7 @@ async def _run_new(
         critic_findings_open=0,
         provider_used=provider_used,
         summary=(
-            f"implemented with {len(candidates)} candidates "
-            f"(winner={winner.id}, score={consensus.scores.get(winner.id, 0):.2f})"
+            f"implemented with {len(candidates)} candidates (winner={winner_label})"
             + (f"\n\ndocs: {docs_note}" if docs_note else "")
         ),
         dry_run=config.dry_run,
@@ -721,6 +760,13 @@ async def run(
     kb_path: str | None = None,
 ) -> Manifest:
     resolved_kind = kind or "new"
+
+    path_error = _validate_target_paths(target_paths)
+    if path_error:
+        return Manifest(
+            tool=_WORKFLOW, tests_status="not_run",
+            summary=path_error, dry_run=config.dry_run,
+        )
 
     if resolved_kind == "new":
         return await _run_new(

@@ -6,6 +6,42 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Fixed
+- **Two real bugs reported by another agent using team-mcp on an
+  unrelated project** ("errored out on every directory-shaped
+  target_paths call, then gave 'no consensus' even with file-level
+  targets — a farm-side issue, not something reformatting the spec
+  fixed"). Both confirmed by reading the code and reproducing locally,
+  not just from the report:
+  - `workflows/feature.py::_read_base_files` handed any `target_paths`
+    entry straight to `Path.read_text()` as long as it `.exists()` —
+    true for directories too. Reading a directory raises
+    (`PermissionError` on Windows, confirmed by reproducing it locally;
+    `IsADirectoryError` on POSIX), uncaught anywhere upstream, so a
+    directory-shaped `target_paths` crashed the whole MCP tool call with
+    no `Manifest` at all — violating the project's own hard rule that
+    every failure comes back as a `Manifest`, never an uncaught
+    exception. Added `_validate_target_paths()`, checked once at the top
+    of `run()` for all four `kind`s, returning a clear error instead.
+  - `engine/consensus.py` has computed an `escalate_to_premium` signal
+    since it was first written, specifically for the case where no
+    candidate satisfies even one other candidate's tests (`winner_id is
+    None`) — but nothing ever read that flag. `_run_new` just gave up
+    with "no clear consensus winner... needs manual synthesis or
+    team_epic," advice that doesn't actually help (`team_epic` runs the
+    same algorithm, it wouldn't converge either). `_run_refactor` and
+    `_run_fix` already had this right — both fall back to `repair_loop`'s
+    existing premium-tier escalation when their own winner-selection
+    comes up empty; `_run_new` now does the same. Verified live: the
+    normal (winner-found) path still produces the same
+    `implemented with N candidates (winner=..., score=...)` manifest as
+    before; the rescue path itself is covered by a new unit test that
+    forces `winner_id=None` via a monkeypatched `consensus.verify_candidate`
+    while leaving `repair.py`'s own verification real (a genuine
+    subprocess `pytest` run against a genuine scratch dir, not mocked),
+    confirming `_run_new` actually invokes and uses the rescue rather
+    than just asserting the return value of a fully-mocked call.
+
 ### Added
 - `python -m team_mcp.cli usage [--days N]`: a combined token-usage
   report. Investigated whether agy's usage could be synced *into*
