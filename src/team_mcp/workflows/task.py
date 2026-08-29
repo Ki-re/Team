@@ -73,13 +73,16 @@ async def run(
             instruction=instruction, path=target_path, content=content,
             error_context=error_context,
         )
-        raw = await router.coder(_WORKFLOW, prompt, temperature=0.4 if attempt == 1 else 0.2)
-
         try:
+            raw = await router.coder(_WORKFLOW, prompt, temperature=0.4 if attempt == 1 else 0.2)
             data = _extract_json(raw)
             edit = FileEdit(path=target_path, search=data["search"], replace=data["replace"])
         except (ValueError, KeyError) as exc:
             last_error = f"invalid JSON from the worker: {exc}"
+            error_context = f"\nThe previous attempt failed: {last_error}\n"
+            continue
+        except Exception as exc:  # noqa: BLE001 — a downed tier-coder call must not crash the whole tool call uncaught; retried the same as invalid JSON, not escalated further, since team_task's own budget is just 2 attempts
+            last_error = f"tier-coder call failed: {type(exc).__name__}: {exc}"
             error_context = f"\nThe previous attempt failed: {last_error}\n"
             continue
 

@@ -194,7 +194,12 @@ async def repair_loop(
         prompt = _PROMPT.format(
             spec=spec, code=_render_code(base_files, current_edits), error=current_error[:1500],
         )
-        raw = await router.coder(workflow, prompt, temperature=0.2)
+        try:
+            raw = await router.coder(workflow, prompt, temperature=0.2)
+        except Exception as exc:  # noqa: BLE001 — a downed tier-coder call must not crash the whole repair loop (and everything that called it) uncaught; found live as the likely cause of team_feature crashing during exactly the consensus-failure rescue this loop provides, while tier-coder was genuinely flaky (ReadTimeouts confirmed in the ledger)
+            current_error = f"tier-coder call failed: {type(exc).__name__}: {exc}"[:300]
+            attempts.append(RepairAttempt(iteration=i, edits=[], based_on_error=current_error))
+            continue
 
         try:
             new_edits = _parse_repair_edits(raw)

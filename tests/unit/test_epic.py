@@ -67,6 +67,33 @@ async def test_run_executes_independent_nodes_and_then_dependent(make_config, mo
     assert set(manifest.files_changed) == {"a.py", "b.py", "c.py"}
 
 
+async def test_run_survives_a_node_raising_and_still_completes_its_sibling(make_config, monkeypatch):
+    # real bug found live: asyncio.gather over the wave's nodes had no
+    # return_exceptions=True, so one node crashing uncaught (the same
+    # class of bug just fixed in feature.py/repair.py/task.py — e.g. a
+    # tier-coder ReadTimeout that somehow still escapes) would cancel its
+    # sibling node too and crash the whole team_epic call.
+    config = make_config()
+    ledger = Ledger(config)
+
+    async def fake_run(router, ledger, config, *, spec, target_paths, kind=None, repro_command=None):
+        if spec == "boom":
+            raise TimeoutError("gateway didn't respond after 120.0s")
+        return Manifest(tool="team_feature", files_changed=["ok.py"], tests_status="green")
+
+    monkeypatch.setattr(epic_mod.feature, "run", fake_run)
+
+    plan = [
+        {"id": "a", "spec": "boom", "target_paths": []},
+        {"id": "b", "spec": "fine", "target_paths": []},
+    ]
+    manifest = await run(_FakeRouter(), ledger, config, plan=plan, budget=100_000)
+
+    assert manifest.tests_status == "red"  # node a failed
+    assert "ok.py" in manifest.files_changed  # but node b still completed and its output survived
+    assert "1 failed" in manifest.summary
+
+
 async def test_run_skips_dependents_of_failed_node(make_config, monkeypatch):
     config = make_config()
     ledger = Ledger(config)

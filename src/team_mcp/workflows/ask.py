@@ -184,7 +184,13 @@ async def run(
     answer = ""
     if digests:
         reduce_prompt = _REDUCE_PROMPT.format(question=question, digests="\n\n".join(digests))
-        answer = await router.context(_WORKFLOW, reduce_prompt, temperature=0.2)
+        try:
+            answer = await router.context(_WORKFLOW, reduce_prompt, temperature=0.2)
+        except Exception as exc:  # noqa: BLE001 — a downed tier-context call for the final synthesis must not crash team_ask when the raw per-chunk digests are already sitting right there, still useful degraded
+            answer = (
+                f"[synthesis unavailable ({type(exc).__name__}: {exc}); raw excerpts follow instead]\n\n"
+                + "\n\n".join(digests)
+            )
 
     if allow_web_search:
         web_prompt = _WEB_AUGMENT_PROMPT.format(

@@ -41,13 +41,20 @@ def _validate_plan(plan: list[dict]) -> str | None:
 
 
 async def _run_node(router: Router, ledger: Ledger, config: Config, node: dict) -> Manifest:
-    return await feature.run(
-        router, ledger, config,
-        spec=node["spec"],
-        target_paths=node.get("target_paths", []),
-        kind=node.get("kind"),
-        repro_command=node.get("repro_command"),
-    )
+    try:
+        return await feature.run(
+            router, ledger, config,
+            spec=node["spec"],
+            target_paths=node.get("target_paths", []),
+            kind=node.get("kind"),
+            repro_command=node.get("repro_command"),
+        )
+    except Exception as exc:  # noqa: BLE001 — one node's uncaught failure must not cancel its sibling nodes (asyncio.gather has no return_exceptions here) or crash the whole epic; defense-in-depth alongside the specific feature.py/repair.py fixes for this same bug class
+        return Manifest(
+            tool="team_feature", tests_status="red",
+            summary=f"node '{node.get('id', '?')}' crashed: {type(exc).__name__}: {exc}"[:500],
+            dry_run=config.dry_run,
+        )
 
 
 async def run(

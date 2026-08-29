@@ -146,3 +146,39 @@ async def test_run_new_falls_back_to_premium_rescue_when_consensus_finds_no_winn
     assert "premium-rescue" in manifest.summary
     assert manifest.files_changed
     assert (tmp_path / "a.py").exists()
+
+
+# --- _run_review: one downed rubric pass must not crash the other two -----
+
+
+class _OneRubricFailsRouter:
+    """premium_review() (what critic.review() calls) raises for the
+    "security" rubric specifically, succeeds for the other two — real bug
+    found live: the 3 review passes ran under a bare asyncio.gather with
+    no return_exceptions, so one downed critic call cancelled the other
+    two and crashed kind=review entirely instead of reporting 2/3 passes."""
+
+    last_used = "fallback"
+
+    async def premium_review(self, workflow, prompt):
+        if "path traversal" in prompt.lower():  # unique to the "security" rubric's own text
+            raise TimeoutError("gateway didn't respond after 120.0s")
+        return '{"findings": []}'
+
+
+async def test_run_review_survives_one_rubric_pass_raising(make_config, tmp_path):
+    f = tmp_path / "a.py"
+    f.write_text("def f():\n    return 1\n")
+    config = make_config(sandbox_roots=[tmp_path])
+    ledger = Ledger(config)
+    router = _OneRubricFailsRouter()
+    router.premium = router  # feature.py reads router.premium.last_used
+
+    manifest = await feature.run(
+        router, ledger, config, spec="review this", target_paths=[str(f)], kind="review",
+    )
+
+    assert manifest.tests_status == "not_run"
+    assert "2/3 review passes unavailable" not in manifest.summary  # only 1 of 3 failed
+    assert "1/3 review passes unavailable" in manifest.summary
+    assert "TimeoutError" in manifest.summary

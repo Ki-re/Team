@@ -138,3 +138,53 @@ async def test_repair_loop_skips_premium_when_disabled(make_config):
     )
     assert outcome.success is False
     assert router.premium_calls == 0
+
+
+class _RaisingThenWorkingRouter:
+    """coder() raises for the first N calls (simulating a downed
+    tier-coder backend, e.g. a real ReadTimeout), then starts returning a
+    working response — real bug found live: repair_loop's own coder call
+    wasn't wrapped in try/except, so a single flaky backend crashed the
+    whole repair loop (and everything that called it) uncaught, exactly
+    while tier-coder was genuinely timing out in production."""
+
+    def __init__(self, fail_times: int, working_response: str):
+        self._fail_times = fail_times
+        self._working_response = working_response
+        self._calls = 0
+        self.premium_calls = 0
+
+    async def coder(self, workflow, prompt, temperature=0.2):
+        self._calls += 1
+        if self._calls <= self._fail_times:
+            raise TimeoutError(f"call {self._calls}: gateway didn't respond after 120.0s")
+        return self._working_response
+
+    async def premium_review(self, workflow, prompt):
+        self.premium_calls += 1
+        raise RuntimeError("agy unavailable in this test")
+
+
+async def test_repair_loop_survives_coder_call_raising_and_retries(make_config):
+    sandbox = Sandbox(make_config())
+    router = _RaisingThenWorkingRouter(fail_times=1, working_response=_WORKING_JSON)
+    outcome = await repair_loop(
+        router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
+        max_iterations=3,
+    )
+    assert outcome.success is True
+    assert router.premium_calls == 0  # never needed to escalate: recovered on the retry
+
+
+async def test_repair_loop_falls_through_to_premium_when_coder_never_recovers(make_config):
+    sandbox = Sandbox(make_config())
+    router = _RaisingThenWorkingRouter(fail_times=99, working_response=_WORKING_JSON)
+    outcome = await repair_loop(
+        router, "wf", sandbox, {"a.py": "broken\n"}, "spec",
+        [FileEdit(path="a.py", search="", replace="broken\n")], "initial error",
+        max_iterations=3,
+    )
+    assert outcome.success is False
+    assert router.premium_calls == 1
+    assert "TimeoutError" in outcome.last_error

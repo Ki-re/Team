@@ -32,7 +32,14 @@ from team_mcp.engine.jsonio import extract_json_dict
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.repair import repair_loop
 from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
-from team_mcp.engine.schemas import CriticFinding, FeatureKind, FileEdit, Manifest, Severity
+from team_mcp.engine.schemas import (
+    CriticFinding,
+    CriticReport,
+    FeatureKind,
+    FileEdit,
+    Manifest,
+    Severity,
+)
 from team_mcp.engine.verify import VerifyTarget, verify_candidate
 from team_mcp.providers.router import Router
 from team_mcp.workflows import docs_sync
@@ -352,8 +359,11 @@ async def _run_new(
         edits = winner.edits + winner.test_edits
         winner_label = f"{winner.id}, score={consensus.scores.get(winner.id, 0):.2f}"
 
-        critic_report = await critic_review(router, _WORKFLOW, spec, winner.edits)
-        blocking = critic_report.blocking(Severity.high)
+        try:
+            critic_report = await critic_review(router, _WORKFLOW, spec, winner.edits)
+            blocking = critic_report.blocking(Severity.high)
+        except Exception:  # noqa: BLE001 — an unreachable critic must not crash a winner whose own tests already passed; proceed without the critique instead of losing the whole result
+            blocking = []
 
         tests_ok = True
         if consensus.matrix:
@@ -662,8 +672,11 @@ async def _run_fix(
     else:
         final_edits = winner.edits
 
-    critic_report = await critic_review(router, _WORKFLOW, spec, final_edits)
-    blocking = critic_report.blocking(Severity.high)
+    try:
+        critic_report = await critic_review(router, _WORKFLOW, spec, final_edits)
+        blocking = critic_report.blocking(Severity.high)
+    except Exception:  # noqa: BLE001 — an unreachable critic must not crash a fix whose repro_command already passed; proceed without the critique instead of losing the whole result
+        blocking = []
     provider_used = {"tier_premium": "agy" if router.premium.last_used != "fallback" else "fallback"}
 
     try:
@@ -722,10 +735,17 @@ async def _run_review(
 
     edits = [FileEdit(path=name, search="", replace=content) for name, content in base_files.items()]
 
-    reports = await asyncio.gather(*[
-        critic_review(router, _WORKFLOW, spec or "general quality review", edits, focus=focus)
-        for focus in _REVIEW_RUBRICS.values()
+    async def _pass(name: str, focus: str) -> tuple[CriticReport, str | None]:
+        try:
+            return await critic_review(router, _WORKFLOW, spec or "general quality review", edits, focus=focus), None
+        except Exception as exc:  # noqa: BLE001 — one downed rubric pass must not crash (or cancel, via gather) the other two
+            return CriticReport(findings=[]), f"{name}: {type(exc).__name__}: {exc}"[:200]
+
+    results = await asyncio.gather(*[
+        _pass(name, focus) for name, focus in _REVIEW_RUBRICS.items()
     ])
+    reports = [r for r, _ in results]
+    pass_errors = [e for _, e in results if e]
     all_findings = [f for report in reports for f in report.findings]
     deduped = _dedupe_findings(all_findings)
 
@@ -738,6 +758,8 @@ async def _run_review(
             for f in deduped[:15]
         ]
         summary = f"{len(deduped)} confirmed findings:\n" + "\n".join(lines)
+    if pass_errors:
+        summary += f"\n\n({len(pass_errors)}/3 review passes unavailable: {'; '.join(pass_errors)})"
 
     return Manifest(
         tool=_WORKFLOW, kind=FeatureKind.review,

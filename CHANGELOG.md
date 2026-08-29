@@ -7,6 +7,43 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 ## [Unreleased]
 
 ### Fixed
+- **The same report, still failing after the fix above** — turned out the
+  fix was real but incomplete. The ledger showed genuine `ReadTimeout`s
+  on `tier-coder` in production (a real, transient, provider-side
+  degradation — direct probes against the flagged models and against the
+  gateway itself succeeded fine minutes later, consistent with this
+  project's prior experience with free-tier flakiness). The new
+  premium-tier rescue now *routes into* `repair_loop` far more often than
+  before — and `repair_loop`'s own `router.coder()` call was never
+  wrapped in try/except, unlike every other tier-coder call site in this
+  codebase. So exactly while tier-coder was flaky, the rescue path itself
+  crashed uncaught, looking identical to the original bug from the
+  outside. Audited every `router.*` call site in the codebase for the
+  same gap and found four more, all now fixed the same way (retry/record,
+  never propagate uncaught):
+  - `engine/repair.py::repair_loop` — the tier-coder call itself.
+  - `workflows/task.py` — `team_task`'s own tier-coder call (same class
+    of bug, different tool).
+  - `workflows/ask.py` — the final tier-context synthesis call; now falls
+    back to the raw per-chunk digests instead of crashing when they're
+    already sitting right there.
+  - `workflows/feature.py` — three unwrapped `critic_review()` call sites
+    (`_run_new`, `_run_fix`, and `_run_review`'s 3-way `asyncio.gather`,
+    which had no `return_exceptions=True` — one downed rubric pass used
+    to cancel the other two and crash `kind=review` entirely; now reports
+    e.g. "1/3 review passes unavailable" instead).
+  - `workflows/epic.py` — `team_epic`'s own node-level `asyncio.gather`
+    had the identical no-isolation shape; one node crashing uncaught
+    (known bug or not) used to cancel its sibling nodes too. Now a
+    crashing node is caught and reported as that node's own failed
+    result, siblings unaffected — defense-in-depth alongside the
+    specific fixes above, in case some other uncaught path still exists.
+  Verified live: `team_feature` and `team_epic` both still complete
+  normally end-to-end against the real gateway (unchanged manifest
+  shapes), and each fix has a unit test that reproduces the exact crash
+  (a fake router that raises `TimeoutError`, matching the real ledger
+  entries) and confirms it's now handled instead of propagating.
+
 - **Two real bugs reported by another agent using team-mcp on an
   unrelated project** ("errored out on every directory-shaped
   target_paths call, then gave 'no consensus' even with file-level
