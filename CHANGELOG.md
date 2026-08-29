@@ -6,6 +6,25 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Added
+- `python -m team_mcp.cli usage [--days N]`: a combined token-usage
+  report. Investigated whether agy's usage could be synced *into*
+  LiteLLM's own spend tables instead (so there'd be one source of truth)
+  — no supported endpoint for it on this OSS deployment (`/spend/report`
+  exists but is Enterprise-only and 402s here; LiteLLM's `mock_response`
+  testing feature can register a fake request but not with real custom
+  token counts; direct Postgres writes would need a DB port that isn't
+  exposed outside the gateway's own docker network, and would couple this
+  project to LiteLLM's internal schema across version upgrades). Merges
+  LiteLLM's `GET /user/daily/activity` (free on OSS, unlike the
+  Enterprise-only `/spend/report` — everything that went through the
+  proxy) with team-mcp's own ledger (`agy:`-prefixed rows only, the sole
+  place agy's usage lands) into one printed report instead, since a
+  literal data merge isn't available. `GatewayProvider` gains
+  `daily_activity()`; `Ledger` gains `spend_summary()` (per-model
+  **sums**, not the averages `model_stats()` already provided for
+  selftest-style health checks).
+
 ### Fixed
 - `providers/agy.py`/`router.py`: `premium_review` hardcoded
   `tokens_in=0, tokens_out=0` into the ledger unconditionally, for every

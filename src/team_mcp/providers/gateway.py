@@ -100,6 +100,21 @@ class GatewayProvider:
             raise GatewayError(f"{tier} (responses): no parseable output_text in {str(data)[:500]}")
         return joined
 
+    async def daily_activity(self, start_date: str, end_date: str) -> dict:
+        """`GET /user/daily/activity` — per-day token/spend totals with a
+        breakdown by model, for everything that went through the proxy
+        (never sees `agy`'s own usage — that's a local subprocess CLI,
+        not a proxy call; see `cli.py`'s `usage` report for how the two
+        get combined). Free on this OSS deployment, unlike
+        `/global/spend/report`, which is Enterprise-only and 402s here."""
+        resp = await self._client.get(
+            "/user/daily/activity",
+            params={"start_date": start_date, "end_date": end_date},
+        )
+        if resp.status_code >= 400:
+            raise GatewayError(f"daily_activity -> HTTP {resp.status_code}: {resp.text[:500]}")
+        return resp.json()
+
     async def liveliness(self) -> bool:
         try:
             resp = await self._client.get("/health/liveliness", timeout=5.0)

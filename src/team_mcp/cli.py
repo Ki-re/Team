@@ -29,6 +29,62 @@ async def _probe_gateway(router: Router) -> None:
     print(json.dumps({"gateway_alive": alive}, ensure_ascii=False))
 
 
+async def _usage_report(router: Router, ledger: Ledger, days: int) -> None:
+    """Combines two data sources that can't be merged server-side: the
+    gateway's own tracking (everything that actually went through
+    LiteLLM — tier-fast/coder/context, and the tier-premium API
+    fallback) and team-mcp's own ledger (the only place `agy`'s usage
+    ever lands, since it's a local subprocess CLI that never touches the
+    gateway at all — see providers/agy.py's module docstring for why
+    that's by design, not a gap to route around)."""
+    import datetime as _dt
+
+    end = _dt.date.today()  # noqa: DTZ011 — a daily usage report doesn't need tz-awareness, local date is fine
+    start = end - _dt.timedelta(days=days - 1)
+
+    gateway_totals: dict[str, dict[str, int]] = {}
+    gateway_error: str | None = None
+    try:
+        data = await router.gateway.daily_activity(start.isoformat(), end.isoformat())
+        for day in data.get("results", []):
+            for model, m in day.get("breakdown", {}).get("models", {}).items():
+                metrics = m.get("metrics", {})
+                slot = gateway_totals.setdefault(model, {"tokens_in": 0, "tokens_out": 0, "requests": 0})
+                slot["tokens_in"] += metrics.get("prompt_tokens", 0)
+                slot["tokens_out"] += metrics.get("completion_tokens", 0)
+                slot["requests"] += metrics.get("api_requests", 0)
+    except Exception as exc:  # noqa: BLE001 — a reporting tool should degrade, not crash
+        gateway_error = f"{type(exc).__name__}: {exc}"[:300]
+
+    agy_totals = ledger.spend_summary(since_seconds=days * 86400, model_prefix="agy:")
+
+    def _print_section(title: str, totals: dict[str, dict[str, int]], error: str | None = None) -> int:
+        print(title)
+        if error:
+            print(f"  [unavailable: {error}]")
+            return 0
+        total = 0
+        for model, t in sorted(totals.items(), key=lambda kv: -(kv[1]["tokens_in"] + kv[1]["tokens_out"])):
+            tok = t["tokens_in"] + t["tokens_out"]
+            total += tok
+            print(f"  {model:55s} {tok:>10} tok  ({t['requests']} req)")
+        if not totals:
+            print("  (no activity in range)")
+        print(f"  {'TOTAL':55s} {total:>10} tok")
+        return total
+
+    print(f"Usage report — last {days} day(s) ({start.isoformat()} to {end.isoformat()})")
+    print()
+    total_gw = _print_section(
+        "Through the LiteLLM gateway (tier-fast/coder/context, premium API fallback):",
+        gateway_totals, gateway_error,
+    )
+    print()
+    total_agy = _print_section("agy (local subscription CLI — never touches the gateway):", agy_totals)
+    print()
+    print(f"GRAND TOTAL: {total_gw + total_agy} tokens")
+
+
 async def _run_workflow(router: Router, ledger: Ledger, config, tool: str, kwargs: dict) -> None:
     from team_mcp.workflows import ask, epic, feature, task, validate
 
@@ -62,6 +118,9 @@ def main() -> None:
 
     p_probe = sub.add_parser("probe", help="check a provider's availability")
     p_probe.add_argument("--provider", choices=["agy", "gateway"], required=True)
+
+    p_usage = sub.add_parser("usage", help="combined token usage report: gateway + agy")
+    p_usage.add_argument("--days", type=int, default=1, help="trailing window size (default: 1, today only)")
 
     p_run = sub.add_parser("run", help="run a workflow directly")
     p_run.add_argument("tool", choices=["team_task", "team_feature", "team_epic", "team_ask", "team_validate"])
@@ -112,6 +171,10 @@ def main() -> None:
                     await _probe_agy(router)
                 else:
                     await _probe_gateway(router)
+                return
+
+            if args.cmd == "usage":
+                await _usage_report(router, ledger, args.days)
                 return
 
             kwargs: dict = {}

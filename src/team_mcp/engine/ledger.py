@@ -88,6 +88,26 @@ class Ledger:
         if spent >= budget:
             raise BudgetExceeded(spent, budget)
 
+    def spend_summary(self, since_seconds: float, model_prefix: str | None = None) -> dict[str, dict[str, int]]:
+        """Per-model SUM (not average) of tokens_in/tokens_out/requests
+        since `since_seconds` ago, optionally filtered to models starting
+        with `model_prefix`. Used by `cli.py`'s `usage` report — unlike
+        `model_stats()` (average tokens per call, for selftest-style
+        health checks), a spend report needs totals."""
+        cutoff = time.time() - since_seconds
+        query = "SELECT model, SUM(tokens_in), SUM(tokens_out), COUNT(*) FROM spend WHERE ts >= ?"
+        params: list = [cutoff]
+        if model_prefix is not None:
+            query += " AND model LIKE ?"
+            params.append(f"{model_prefix}%")
+        query += " GROUP BY model"
+        with closing(self._connect()) as con:
+            rows = con.execute(query, params).fetchall()
+        return {
+            r[0]: {"tokens_in": r[1] or 0, "tokens_out": r[2] or 0, "requests": r[3]}
+            for r in rows
+        }
+
     def model_stats(self, since_seconds: float = 7 * 24 * 3600) -> list[dict]:
         cutoff = time.time() - since_seconds
         with closing(self._connect()) as con:
