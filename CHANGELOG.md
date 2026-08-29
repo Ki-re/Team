@@ -6,6 +6,24 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Fixed
+- `providers/agy.py`/`router.py`: `premium_review` hardcoded
+  `tokens_in=0, tokens_out=0` into the ledger unconditionally, for every
+  premium-tier call, agy or fallback alike — the gateway fallback's real
+  usage (`resp["usage"]`) was already available and simply discarded, and
+  the agy-CLI path had genuinely no usage info because it requested
+  `--output-format text`. Switched agy's default invocation to
+  `--output-format json` (confirmed live: agy returns
+  `{"response": ..., "usage": {"input_tokens": N, "output_tokens": N, ...}}`
+  in that mode) and added `_parse_agy_output()` to extract both, with a
+  clean fall-back to treating the whole output as plain content (and
+  `last_usage=None`, not a fabricated zero) for any other CLI substituted
+  in via `TEAM_AGY_CLI_ARGS` that doesn't share that shape. `PremiumProvider`
+  gains `last_usage`, threaded into the ledger the same way `last_used`/
+  `last_error` already were. Verified live end-to-end (not just against
+  mocks): a real `premium_review` call landed real, non-zero token counts
+  in `.team_sandbox/ledger.sqlite3`.
+
 ### Added
 - Live gateway roster: 7 new free-tier model entries added via LiteLLM's
   admin API (`store_model_in_db: true`, no redeploy needed), each

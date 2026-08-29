@@ -33,11 +33,22 @@ Binary resolution order:
 
 If none of this resolves, or the subprocess fails/times out, it degrades
 to the gateway's `tier-premium` model group and notes why in the ledger.
+
+Token accounting: LiteLLM's own spend tracking (its `/user/daily/activity`
+endpoint, or the gateway's `/ui`) only sees calls that actually go through
+the proxy — the agy-CLI path never does, by design (it authenticates via
+the operator's own subscription, on their own machine, not the shared
+gateway). `router.py::premium_review` records agy's usage into team-mcp's
+own SQLite ledger instead, using `last_usage` below — real numbers when
+agy's `--output-format json` mode is in play (the default), `None`
+(honestly unknown, not a fabricated zero) for any other CLI substituted
+in via TEAM_AGY_CLI_ARGS that doesn't share that JSON shape.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 from pathlib import Path
 
@@ -52,12 +63,47 @@ _KNOWN_PATHS = [
 ]
 
 # Default template = agy's real invocation, confirmed with `agy --help`
-# (agy 1.1.19): `agy --print "<prompt>" --output-format text`, non-
-# interactive mode, doesn't use stdin, has no `run` subcommand. The
+# (agy 1.1.19): `agy --print "<prompt>" --output-format json`, non-
+# interactive mode, doesn't use stdin, has no `run` subcommand.
+# `--output-format json` (rather than the plain `text` this used to
+# request) is what makes real token accounting possible at all — agy's
+# JSON mode returns `{"response": "...", "usage": {"input_tokens": N,
+# "output_tokens": N, ...}}`, confirmed live; plain-text mode gives no
+# usage info whatsoever. See _parse_agy_output for how this is consumed,
+# with a plain-text fallback for any other CLI substituted in via
+# TEAM_AGY_CLI_ARGS that doesn't happen to share this JSON shape. The
 # literal token "{prompt}" gets replaced with the prompt as ONE single
 # argv element (never interpolated into a shell string, so a prompt with
 # quotes/spaces/newlines needs no special escaping) — see _build_argv.
-_DEFAULT_CLI_ARGS = "--print|{prompt}|--output-format|text"
+_DEFAULT_CLI_ARGS = "--print|{prompt}|--output-format|json"
+
+
+def _parse_agy_output(raw: str) -> tuple[str, dict[str, int] | None]:
+    """Returns (content, usage). `usage` is `{"input_tokens": N,
+    "output_tokens": N}` when `raw` is agy's own JSON output shape,
+    or None when it isn't (a plain-text CLI substituted in via
+    TEAM_AGY_CLI_ARGS, or agy running under a text-mode override) — in
+    that case the whole of `raw` is treated as the content, exactly like
+    before this function existed. Never raises: worst case is treating
+    JSON-looking-but-differently-shaped output as plain text."""
+    stripped = raw.strip()
+    if not stripped.startswith("{"):
+        return raw, None
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        return raw, None
+    if not isinstance(data, dict) or "response" not in data:
+        return raw, None
+
+    usage_raw = data.get("usage")
+    usage = None
+    if isinstance(usage_raw, dict):
+        usage = {
+            "input_tokens": int(usage_raw.get("input_tokens", 0)),
+            "output_tokens": int(usage_raw.get("output_tokens", 0)),
+        }
+    return data["response"], usage
 
 
 class AgyUnavailable(RuntimeError):
@@ -89,6 +135,7 @@ class PremiumProvider:
         self._agy_path = resolve_agy_path(config)
         self.last_used: str | None = None  # "agy" | "fallback" — for the ledger
         self.last_error: str | None = None  # fallback reason, if any — for the ledger
+        self.last_usage: dict[str, int] | None = None  # {"input_tokens", "output_tokens"} — for the ledger; None when unknown (e.g. a plain-text CLI override)
 
     @property
     def agy_available(self) -> bool:
@@ -116,6 +163,7 @@ class PremiumProvider:
 
     async def complete(self, prompt: str, *, timeout: float = 180.0) -> str:
         self.last_error = None
+        self.last_usage = None
         if self._agy_path:
             try:
                 return await self._run_agy(prompt, timeout=timeout)
@@ -131,6 +179,15 @@ class PremiumProvider:
             [{"role": "user", "content": prompt}],
             temperature=0.2,
         )
+        # the fallback goes through the gateway, which DOES return real
+        # usage — unlike the agy-CLI path, this was always available and
+        # was simply being discarded before.
+        usage = resp.get("usage")
+        if usage:
+            self.last_usage = {
+                "input_tokens": usage.get("prompt_tokens", 0),
+                "output_tokens": usage.get("completion_tokens", 0),
+            }
         return resp["choices"][0]["message"]["content"]
 
     def _build_argv(self, prompt: str) -> list[str]:
@@ -168,4 +225,6 @@ class PremiumProvider:
             raise RuntimeError(f"agy exit={proc.returncode}: {stderr.decode(errors='replace')[:300]}")
 
         self.last_used = "agy"
-        return stdout.decode(errors="replace")
+        content, usage = _parse_agy_output(stdout.decode(errors="replace"))
+        self.last_usage = usage
+        return content

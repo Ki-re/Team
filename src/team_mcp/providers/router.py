@@ -113,10 +113,16 @@ class Router:
     async def premium_review(self, workflow: str, prompt: str) -> str:
         t0 = time.monotonic()
         result = await self.premium.complete(prompt)
+        # real numbers when available (agy's --output-format json, or the
+        # gateway fallback, which always has them) — 0,0 only when truly
+        # unknown (a plain-text CLI swapped in via TEAM_AGY_CLI_ARGS),
+        # never a fabricated placeholder passed off as a real reading.
+        usage = self.premium.last_usage or {}
         self._ledger.record(SpendEvent(
             workflow=workflow, tier=self._config.tier_premium,
             model=f"agy:{self.premium.last_used}",
-            tokens_in=0, tokens_out=0,
+            tokens_in=usage.get("input_tokens", 0),
+            tokens_out=usage.get("output_tokens", 0),
             latency_ms=(time.monotonic() - t0) * 1000, ok=True,
             # if agy failed and degraded to the fallback, the reason ends
             # up here instead of getting lost — before, `last_used="fallback"`
