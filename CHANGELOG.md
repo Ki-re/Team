@@ -7,6 +7,22 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 ## [Unreleased]
 
 ### Added
+- Live gateway roster: 3 new entries from 2 new providers, each verified
+  with a real completion against the provider's own API first, then
+  again through the proxy — `tier-coder` gains `cohere_chat/command-a-03-2025`
+  (Cohere's flagship) and `cloudflare/@cf/qwen/qwen2.5-coder-32b-instruct`
+  (a dedicated coder model, Cloudflare Workers AI free tier); `tier-fast`
+  gains `cohere_chat/command-r7b-12-2024`. Two other candidate providers
+  were tested and rejected: **SambaNova** now requires a payment method
+  on file for every model (`PAYMENT_METHOD_REQUIRED`, balance_units=0) —
+  contradicts what was told to the user based on external research alone
+  ("no card needed"); corrected here. **NVIDIA NIM** 404s as "not found
+  for account" on every model tried (5/5), despite all being listed in
+  its own `/v1/models` catalog — the same catalog-vs-entitlement gap
+  already seen with Gemini Pro and Cerebras. Neither added. Not mirrored
+  into `deploy/litellm.config.yaml` (lean template since the 1.1.0 trim,
+  not a live mirror — see the prior roster-expansion entry above).
+
 - `engine/verify.py::compress_log()`: strips ANSI codes and collapses
   repeated consecutive lines (progress bars, retry noise) before
   truncating subprocess output — replaces four blind `[-3000:]`/`[-2000:]`
