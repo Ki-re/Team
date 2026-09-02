@@ -6,6 +6,20 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Added
+- `engine/verify.py::compress_log()`: strips ANSI codes and collapses
+  repeated consecutive lines (progress bars, retry noise) before
+  truncating subprocess output — replaces four blind `[-3000:]`/`[-2000:]`
+  tail-slices (lint/test output in `verify.py`, `_run_repro` in
+  `feature.py`, `_check_tests` in `validate.py`) that previously spent
+  their character budget on whatever happened to be last, not
+  necessarily the actual failure. Inspired by evaluating OmniRoute's
+  "RTK" log-compression engine — reimplemented the log-cleaning idea in
+  ~15 lines of stdlib regex rather than adopting it wholesale. Its prose
+  ("Caveman") half was deliberately skipped: team-mcp's prompts are
+  already terse templates plus real code, not verbose human prose, so a
+  filler-word pass has nothing worth cutting there.
+
 ### Fixed
 - **The same report, still failing after the fix above** — turned out the
   fix was real but incomplete. The ledger showed genuine `ReadTimeout`s

@@ -9,12 +9,37 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from team_mcp.engine.schemas import VerificationResult
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def compress_log(text: str, max_chars: int = 3000) -> str:
+    """Strips ANSI color codes and collapses runs of identical consecutive
+    lines (progress bars, repeated retry noise) before truncating to the
+    tail, so the character budget goes to the actual failure/traceback
+    instead of whatever happened to be last. A cheap, regex-only version
+    of what OmniRoute calls its "RTK" log-compression engine — every
+    subprocess-output truncation site in this codebase used to just slice
+    the raw tail. Deliberately skips OmniRoute's prose ("Caveman") half:
+    team-mcp's prompts are already terse templates plus real code, not
+    verbose human prose, so a filler-word pass has nothing worth cutting
+    there and risks mangling meaning for no real savings."""
+    text = _ANSI_RE.sub("", text)
+    deduped: list[str] = []
+    last: str | None = None
+    for line in text.splitlines():
+        if line == last:
+            continue
+        last = line
+        deduped.append(line)
+    return "\n".join(deduped)[-max_chars:]
 
 
 @dataclass
@@ -46,7 +71,7 @@ def _lint(workdir: Path, timeout_s: float) -> tuple[bool, str]:
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         return True, f"ruff unavailable/timeout, skipped: {exc}"
-    return proc.returncode == 0, proc.stdout[-2000:]
+    return proc.returncode == 0, compress_log(proc.stdout, max_chars=2000)
 
 
 async def verify_candidate(target: VerifyTarget) -> VerificationResult:
@@ -86,7 +111,7 @@ def _run_tests(cmd: list[str], workdir: Path, timeout_s: float) -> tuple[int, in
 
     output = proc.stdout + proc.stderr
     run, passed = _parse_pytest_summary(output)
-    return run, passed, output[-3000:]
+    return run, passed, compress_log(output)
 
 
 def _parse_pytest_summary(output: str) -> tuple[int, int]:

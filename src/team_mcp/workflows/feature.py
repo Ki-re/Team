@@ -40,7 +40,7 @@ from team_mcp.engine.schemas import (
     Manifest,
     Severity,
 )
-from team_mcp.engine.verify import VerifyTarget, verify_candidate
+from team_mcp.engine.verify import VerifyTarget, compress_log, verify_candidate
 from team_mcp.providers.router import Router
 from team_mcp.workflows import docs_sync
 
@@ -254,7 +254,7 @@ async def _run_repro(cmd: list[str], workdir: Path, timeout_s: float = 60.0) -> 
             return False, f"timeout after {timeout_s}s: {exc}"
         except OSError as exc:
             return False, f"could not run repro_command: {exc}"
-        return proc.returncode == 0, (proc.stdout + proc.stderr)[-3000:]
+        return proc.returncode == 0, compress_log(proc.stdout + proc.stderr)
 
     return await asyncio.to_thread(_sync_run)
 

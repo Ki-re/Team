@@ -27,6 +27,7 @@ from team_mcp.engine.frontmatter import (
 )
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.schemas import FileEdit, Manifest
+from team_mcp.engine.verify import compress_log
 from team_mcp.providers.router import Router
 from team_mcp.workflows import ask
 from team_mcp.workflows import selftest as selftest_pipeline
@@ -72,7 +73,7 @@ def _check_tests(scope: Path) -> tuple[bool | None, str]:
     output = proc.stdout + proc.stderr
     if "no tests ran" in output.lower() or "no tests collected" in output.lower():
         return None, "no tests in scope"
-    return proc.returncode == 0, output[-2000:]
+    return proc.returncode == 0, compress_log(output, max_chars=2000)
 
 
 def _check_secrets(files: list[Path]) -> tuple[bool, str]:
