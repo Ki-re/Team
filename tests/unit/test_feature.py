@@ -45,6 +45,29 @@ async def test_generate_candidate_returns_candidate_and_no_error_on_success():
     assert candidate.edits[0].path == "a.py"
 
 
+class _BrokenThenRepairedRouter:
+    """coder() returns malformed JSON (a trailing comma, the kind a weak
+    free model slips in under pressure); fast() is the tier-fast repair
+    call jsonio.extract_json_dict_with_repair makes — real bug found
+    live: this rescue existed in jsonio.py but was never wired into
+    team_feature's own fan-out, so a candidate like this used to be
+    discarded outright instead of cheaply repaired."""
+
+    async def coder(self, workflow, prompt, temperature=0.2):
+        return '{"edits": [{"path": "a.py", "search": "", "replace": "x = 1\\n"},], "test_edits": []}'
+
+    async def fast(self, workflow, prompt, temperature=0.0):
+        return '{"edits": [{"path": "a.py", "search": "", "replace": "x = 1\\n"}], "test_edits": []}'
+
+
+async def test_generate_candidate_recovers_via_tier_fast_repair():
+    router = _BrokenThenRepairedRouter()
+    candidate, error = await _generate_candidate(router, "w1", "spec", ["a.py"], {"a.py": ""})
+    assert error is None
+    assert candidate is not None
+    assert candidate.edits[0].path == "a.py"
+
+
 def test_force_basename_strips_directories_from_model_output():
     # real bug found live: a kind=fix worker copied a path with a
     # subfolder from repro_command instead of using the basename,

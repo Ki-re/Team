@@ -28,3 +28,38 @@ async def test_run_survives_coder_call_raising_and_reports_escalation(make_confi
     assert manifest.escalated_from == "task"
     assert manifest.tests_status == "red"
     assert "TimeoutError" in manifest.summary
+
+
+class _BrokenThenRepairedRouter:
+    """coder() returns malformed JSON on its first (and only, since the
+    repair should succeed) call; fast() is the tier-fast repair call.
+    team_task only gets 2 attempts total, so recovering via a cheap
+    repair instead of burning a full attempt matters even more here than
+    in team_feature's 3-way fan-out."""
+
+    def __init__(self):
+        self.coder_calls = 0
+
+    async def coder(self, workflow, prompt, temperature=0.2):
+        self.coder_calls += 1
+        return '{"search": "", "replace": "x = 1\\n",}'  # trailing comma
+
+    async def fast(self, workflow, prompt, temperature=0.0):
+        return '{"search": "", "replace": "x = 1\\n"}'
+
+
+async def test_run_recovers_via_tier_fast_repair_without_burning_a_retry(make_config, tmp_path):
+    config = make_config(sandbox_roots=[tmp_path])
+    ledger = Ledger(config)
+    target = tmp_path / "a.py"
+    router = _BrokenThenRepairedRouter()
+
+    manifest = await task_run(
+        router, ledger, config,
+        instruction="add x = 1", target_path=str(target),
+    )
+
+    assert manifest.tests_status in ("green", "not_run")
+    assert manifest.escalated_from is None
+    assert router.coder_calls == 1  # recovered via repair, no second attempt needed
+    assert target.read_text() == "x = 1\n"

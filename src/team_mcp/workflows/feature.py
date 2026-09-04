@@ -28,7 +28,7 @@ from pathlib import Path
 from team_mcp.config import Config
 from team_mcp.engine.consensus import ConsensusCandidate, run_consensus
 from team_mcp.engine.critic import review as critic_review
-from team_mcp.engine.jsonio import extract_json_dict
+from team_mcp.engine.jsonio import extract_json_dict, extract_json_dict_with_repair
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.repair import repair_loop
 from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
@@ -288,7 +288,7 @@ async def _generate_candidate(
     prompt = _IMPLEMENT_PROMPT.format(spec=spec, content=content)
     try:
         raw = await router.coder(_WORKFLOW, prompt, temperature=0.8)
-        data = extract_json_dict(raw)
+        data = await extract_json_dict_with_repair(raw, router, _WORKFLOW)
         edits = _force_basename([FileEdit(**e) for e in data["edits"]])
         test_edits = _force_basename([FileEdit(**e) for e in data.get("test_edits", [])])
     except Exception as exc:  # noqa: BLE001 — a downed worker shouldn't take down the fan-out
@@ -446,7 +446,7 @@ async def _run_refactor(
     for _ in range(_MAX_CHAR_TEST_ATTEMPTS):
         try:
             raw = await router.coder(_WORKFLOW, _CHARACTERIZE_PROMPT.format(content=content), temperature=0.3)
-            data = extract_json_dict(raw)
+            data = await extract_json_dict_with_repair(raw, router, _WORKFLOW)
             candidate = _force_basename([FileEdit(**e) for e in data["test_edits"]])
         except Exception as exc:  # noqa: BLE001 — we retry, don't propagate
             char_last_error = f"{type(exc).__name__}: {exc}"[:300]
@@ -474,7 +474,7 @@ async def _run_refactor(
     async def _one(worker_id: str) -> tuple[ConsensusCandidate | None, str | None]:
         try:
             raw = await router.coder(_WORKFLOW, _REFACTOR_PROMPT.format(goal=spec, content=content), temperature=0.7)
-            data = extract_json_dict(raw)
+            data = await extract_json_dict_with_repair(raw, router, _WORKFLOW)
             edits = _force_basename([FileEdit(**e) for e in data["edits"]])
         except Exception as exc:  # noqa: BLE001 — a downed worker shouldn't take down the fan-out
             return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]
@@ -618,7 +618,7 @@ async def _run_fix(
         )
         try:
             raw = await router.coder(_WORKFLOW, prompt, temperature=0.6)
-            data = extract_json_dict(raw)
+            data = await extract_json_dict_with_repair(raw, router, _WORKFLOW)
             edits = _force_basename([FileEdit(**e) for e in data["edits"]])
         except Exception as exc:  # noqa: BLE001 — a downed worker shouldn't take down the fan-out
             return None, f"{worker_id}: {type(exc).__name__}: {exc}"[:300]

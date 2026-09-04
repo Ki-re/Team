@@ -12,12 +12,11 @@ Pipeline (see plan, Layer 0/1 simplified to n=1):
 
 from __future__ import annotations
 
-import json
-import re
 import tempfile
 from pathlib import Path
 
 from team_mcp.config import Config
+from team_mcp.engine.jsonio import extract_json_dict_with_repair
 from team_mcp.engine.ledger import Ledger
 from team_mcp.engine.sandbox import EditConflict, Sandbox, SandboxViolation
 from team_mcp.engine.schemas import FileEdit, Manifest
@@ -47,13 +46,6 @@ and put the new file's full content in `replace`.
 """
 
 
-def _extract_json(raw: str) -> dict:
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not match:
-        raise ValueError(f"no JSON in the model's response: {raw[:200]}")
-    return json.loads(match.group(0))
-
-
 async def run(
     router: Router,
     ledger: Ledger,
@@ -75,7 +67,7 @@ async def run(
         )
         try:
             raw = await router.coder(_WORKFLOW, prompt, temperature=0.4 if attempt == 1 else 0.2)
-            data = _extract_json(raw)
+            data = await extract_json_dict_with_repair(raw, router, _WORKFLOW)
             edit = FileEdit(path=target_path, search=data["search"], replace=data["replace"])
         except (ValueError, KeyError) as exc:
             last_error = f"invalid JSON from the worker: {exc}"

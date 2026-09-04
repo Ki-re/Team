@@ -6,6 +6,31 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Fixed
+- **Reported by another agent**: "`/team` failed twice on this spec
+  (gateway JSON-parse errors from its worker models), so I wrote the
+  files directly instead of blindly retrying." Confirmed a real,
+  significant gap: `engine/jsonio.py`'s own docstring describes a
+  universal rescue chain for small models' frequent broken JSON (parse
+  -> cheap repair via tier-fast -> hard failure, "plan primitive #5"),
+  but `parse_or_repair()` — the function that actually does this — was
+  only ever wired into `critic.py`. Every other caller (`team_feature`'s
+  own N-way fan-out across all four `kind`s, and `team_task`, which only
+  gets 2 attempts total) discarded the entire candidate outright on the
+  first parse failure — a full tier-coder call thrown away for something
+  a cheap tier-fast repair call could very plausibly have fixed. Added
+  `extract_json_dict_with_repair()` (a schema-free sibling of
+  `parse_or_repair`, since the five different JSON shapes across
+  `feature.py` alone aren't worth a pydantic model each) and wired it
+  into every fan-out worker in `feature.py` and into `team_task`, which
+  also lost its own duplicate hand-rolled JSON extractor along the way in
+  favor of the shared one. Verified live (`team_task` and `team_feature`
+  both still complete normally end-to-end) plus new unit tests that
+  reproduce the exact scenario — a syntactically broken JSON response
+  (trailing comma) recovered via a mocked tier-fast repair call, wired
+  through the real `_generate_candidate`/`team_task.run` call paths, not
+  just the helper in isolation.
+
 ### Security
 - **Pre-publication audit before making the repo public.** Two
   independent passes, both clean: a manual regex sweep (API-key-shaped

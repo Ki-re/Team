@@ -77,6 +77,35 @@ def extract_json_dict(raw: str) -> dict:
     return data
 
 
+async def extract_json_dict_with_repair(raw: str, router, workflow: str) -> dict:
+    """Like extract_json_dict, but with the same tier-fast rescue chain
+    parse_or_repair already gave CriticReport — every OTHER caller
+    (team_feature's own fan-out included) went straight from a parse
+    failure to discarding the whole candidate, no repair attempt, despite
+    this module's own docstring describing the rescue chain as universal.
+    Found investigating a report of team_feature failing repeatedly with
+    "gateway JSON-parse errors from its worker models" — losing an entire
+    fan-out candidate (a full tier-coder call) on a cheaply-fixable JSON
+    slip is exactly the waste primitive #5 was meant to avoid.
+
+    No pydantic schema here (unlike parse_or_repair): the shapes this
+    guards (candidate edits, refactor edits, characterization tests, fix
+    patches — five different shapes across workflows/feature.py alone)
+    aren't worth a schema each just to reuse that function; the repair
+    model gets the parse error and the raw text, same as before."""
+    try:
+        return extract_json_dict(raw)
+    except (JsonExtractionError, json.JSONDecodeError) as exc:
+        repair_prompt = (
+            "The following text should be a valid JSON OBJECT (not a "
+            f"list, not anything else).\n\nText to fix:\n{raw}\n\n"
+            f"Parse error: {exc}\n\n"
+            "Return ONLY the fixed JSON object, with no extra text or markdown."
+        )
+        fixed_raw = await router.fast(workflow, repair_prompt, temperature=0.0)
+        return extract_json_dict(fixed_raw)
+
+
 async def parse_or_repair(raw: str, schema: type[T], router, workflow: str) -> T:
     """router: providers.router.Router — the direct import is avoided to
     prevent a cycle (router doesn't depend on engine, but this keeps it loose)."""
