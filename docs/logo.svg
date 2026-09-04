@@ -1,16 +1,51 @@
-<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team logo: a central hub connected to four worker nodes">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team logo: a violet orchestrator hub connected to four colored worker nodes, representing the coding agent delegating to a farm of models">
   <defs>
-    <marker id="none"/>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#f5f3ff"/>
+      <stop offset="100%" stop-color="#ede9fe"/>
+    </radialGradient>
+
+    <linearGradient id="hub" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+
+    <linearGradient id="blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.5" flood-color="#4c1d95" flood-opacity="0.28"/>
+    </filter>
   </defs>
-  <line x1="100" y1="100" x2="143.8" y2="56.2" stroke="#94a3b8" stroke-width="3"/>
-  <line x1="100" y1="100" x2="143.8" y2="143.8" stroke="#94a3b8" stroke-width="3"/>
-  <line x1="100" y1="100" x2="56.2" y2="143.8" stroke="#94a3b8" stroke-width="3"/>
-  <line x1="100" y1="100" x2="56.2" y2="56.2" stroke="#94a3b8" stroke-width="3"/>
 
-  <circle cx="143.8" cy="56.2" r="17" fill="#3b82f6"/>
-  <circle cx="143.8" cy="143.8" r="17" fill="#06b6d4"/>
-  <circle cx="56.2" cy="143.8" r="17" fill="#d97706"/>
-  <circle cx="56.2" cy="56.2" r="17" fill="#16a34a"/>
+  <circle cx="100" cy="100" r="96" fill="url(#bg)"/>
 
-  <circle cx="100" cy="100" r="30" fill="#7c3aed"/>
+  <g stroke-linecap="round" fill="none">
+    <path d="M100,100 C118,84 128,68 143.8,56.2" stroke="#c4b5fd" stroke-width="5"/>
+    <path d="M100,100 C118,116 130,130 143.8,143.8" stroke="#c4b5fd" stroke-width="5"/>
+    <path d="M100,100 C82,116 70,130 56.2,143.8" stroke="#c4b5fd" stroke-width="5"/>
+    <path d="M100,100 C82,84 72,68 56.2,56.2" stroke="#c4b5fd" stroke-width="5"/>
+  </g>
+
+  <circle cx="143.8" cy="56.2" r="19" fill="url(#blue)" filter="url(#soft)"/>
+  <circle cx="143.8" cy="143.8" r="19" fill="url(#cyan)" filter="url(#soft)"/>
+  <circle cx="56.2" cy="143.8" r="19" fill="url(#amber)" filter="url(#soft)"/>
+  <circle cx="56.2" cy="56.2" r="19" fill="url(#green)" filter="url(#soft)"/>
+
+  <circle cx="100" cy="100" r="34" fill="url(#hub)" filter="url(#soft)"/>
+  <circle cx="100" cy="100" r="34" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.55"/>
 </svg>

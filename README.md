@@ -180,7 +180,7 @@ that the change made stale. It never invents new entries on its own.
 ### Prerequisites
 
 - Python 3.11+
-- Docker + Docker Compose, on whatever host will run the gateway (your own
+- [Docker](https://docs.docker.com/get-docker/) + Docker Compose, on whatever host will run the gateway (your own
   machine, a small VPS, a home server — anything reachable from where
   your coding agent runs)
 - API keys for at least a couple of free-tier providers (e.g.
@@ -237,16 +237,19 @@ TEAM_GATEWAY_KEY=<the master key or a virtual key from deploy/.env>
 
 ### 4. Register the MCP server with Claude Code
 
+`pip install -e .` (step 1) also installs a `team-mcp` entry-point script
+inside the venv — point Claude at that directly, no `-m` module path to
+get wrong:
+
 ```bash
-claude mcp add team --scope user -- "/absolute/path/to/Team/.venv/bin/python" -m team_mcp.server
+claude mcp add team --scope user -- "/absolute/path/to/Team/.venv/bin/team-mcp"
 claude mcp list   # should show "team ... Connected"
 ```
 
-On Windows, use the `.venv\Scripts\python.exe` interpreter instead. The
-path must point at *this repo's* virtual environment (not a bare
-`python`) — that's where the `team_mcp` package is installed in editable
-mode. `.env` always loads from this repo's root regardless of which
-project Claude has open when it invokes the server.
+On Windows, that's `.venv\Scripts\team-mcp.exe`. The path must point at
+*this repo's* virtual environment — that's where `team_mcp` is installed
+in editable mode. `.env` always loads from this repo's root regardless of
+which project Claude has open when it invokes the server.
 
 For Claude Desktop, the equivalent manual entry in its JSON config:
 
@@ -254,8 +257,7 @@ For Claude Desktop, the equivalent manual entry in its JSON config:
 {
   "mcpServers": {
     "team": {
-      "command": "/absolute/path/to/Team/.venv/bin/python",
-      "args": ["-m", "team_mcp.server"]
+      "command": "/absolute/path/to/Team/.venv/bin/team-mcp"
     }
   }
 }
@@ -296,7 +298,7 @@ Set up the "team" MCP server for me from https://github.com/Ki-re/Team:
    deploy/.env.example to deploy/.env and fill in at least one provider
    API key, then run `docker compose up -d` there.
 4. Once the gateway is reachable, register this MCP server globally:
-   `claude mcp add team --scope user -- <path-to-repo>/.venv/<bin-or-Scripts>/python -m team_mcp.server`
+   `claude mcp add team --scope user -- <path-to-repo>/.venv/<bin-or-Scripts>/team-mcp`
    then confirm with `claude mcp list` that it shows "Connected".
 5. Copy skill/SKILL.md from this repo to ~/.claude/skills/team/SKILL.md
    (create the directory if needed) so future sessions discover it

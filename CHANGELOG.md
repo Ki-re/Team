@@ -6,7 +6,31 @@ project uses [SemVer](https://semver.org/) for git-tagged versions.
 
 ## [Unreleased]
 
+### Security
+- **Pre-publication audit before making the repo public.** Two
+  independent passes, both clean: a manual regex sweep (API-key-shaped
+  strings, AWS keys, PEM blocks, JWTs, the old real gateway IP) across
+  every one of the 260 blobs that have ever existed in git history — not
+  just the current tree — plus `detect-secrets` over every tracked file.
+  Every hit in both was an expected false positive already known from
+  prior audits: `api_key: os.environ/VAR` indirection in
+  `deploy/litellm.config.yaml` (the keyword "key" triggers the heuristic,
+  the file never holds a real value) and the synthetic AWS-key/PEM-header
+  fixtures in `tests/unit/test_validate.py`. `.gitignore` confirmed
+  correct (`deploy/.env`, `.env`, `*.pem`, `*.key`); only the `.example`
+  templates are tracked, and both hold placeholders only.
+
 ### Added
+- `docs/logo.svg` redesigned — gradients, drop shadow, curved connectors
+  on the same hub-and-spoke metaphor (still legible at favicon size), and
+  a GitHub repo description set (was empty).
+- `team-mcp` (the `pyproject.toml` console-script entry point, installed
+  automatically by `pip install -e .`) is now the documented registration
+  target instead of `python -m team_mcp.server` — one path instead of a
+  binary plus a module argument to get right. Verified live: re-registered
+  the real local MCP server with the new command, `claude mcp list`
+  confirms `Connected`. `pyproject.toml`'s own `description` generalized
+  to match the README's multi-agent framing (was Claude-only).
 - Live gateway roster: 3 new entries from 2 new providers, each verified
   with a real completion against the provider's own API first, then
   again through the proxy — `tier-coder` gains `cohere_chat/command-a-03-2025`
